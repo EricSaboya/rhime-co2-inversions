@@ -1,0 +1,60 @@
+-------------------------------------------------------------------------------------------------------------
+Key updates made to RHIME-CO2
+-------------------------------------------------------------------------------------------------------------
+> 21 March 2025 
+
+'calculate_basis_functions.py'
+    function "optimize_nregions" has been rewritten to more efficiently calculate the basis function regions
+    as it was previously not converging. Tolerance has been increased
+
+    function "bucketbasisfunction" now checks the span of flux data in the model domain. If less than 55% of 
+    fluxes do not span the entire NAME domain then basis functions are calculated for only over the flux 
+    region and the remaining part of the model domain is split into 8 large regions. This should improve the
+    efficiency of calcuting basis functions.
+
+'data_checks.py'
+    New functions for checking consistency between units of data sets as this feature is not included in 
+    OpenGHG. These functions are still being developed! At present, only observation data are being checked. 
+    All trace gas data are converted to mol/mol and inversions are run in this manner rather than in ppm/ppb.
+
+    NB. There is a hack in rhime_co2.py that converts the OpenGHG calculated baseline from ppb (their default)
+    to mol/mol. 
+
+'data_preprocessing.py'
+    Not needed for running inversions. Legacy code from PARIS CO2 work. 
+
+'example_run_rhime_202101.py'
+    Example input file for running RHIME. Ini files have been temporarily abandoned as I think this input
+    dictionary approach lends to more flexibility in this development stage whilst new variables are still
+    being added. 
+    
+'get_co2_data.py'
+    Modularised the different functions. Now also includes options to scale flux fields and boundary
+    condition fields prior to producing forward simulations - potentially useful for testing.
+    "H" matrices are also calculated here. 
+
+    I removed the option for loading pre-saved data as I found for CO2 the pickle files were too
+    large to save. Additionally, with data being stored in dask it means the forward simulations
+    are pretty quick to calculate. 
+
+'input_defns.py'
+    One function has the available input variables used for the inversions. The other
+    provides information on where Paths have been hardwired into the code. 
+
+'inversion_mcmc.py'
+    I started adding in an option to account for flux*FP variability in each basis function
+    (Herr) that would be accounted for in the prior PDF for each basis function. Currently
+    commented this out, as it started raising some issues. 
+
+'model_error_methods.py'
+    Included the model error methods Brendan et al. added to main RHIME. I only use the residual 
+    method as the percentile is not suitable for CO2. 
+
+'postprocessing_output.py'
+    Still somewhat in development. I'm updating the scripts for plotting and processing the inversion
+    output files. 
+
+'sensitivity.py'
+    Moved the "fp_sensitivity" and "bc_sensitivty" functions from utils to this file. 
+
+-------------------------------------------------------------------------------------------------------------
