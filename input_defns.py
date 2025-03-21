@@ -97,6 +97,32 @@ def rhime_co2_dictionary_keys():
                      
                      "c14_nuclear" : {"source": "", 
                                      }
-            
+                    }
 
-}
+
+def paths_to_check():
+    print("---- calculate_basis_functions.py ----")
+    print("load_landsea_indices() --> path to UKMO land-sea definitions grid")
+    print("bucketbasisfunction() --> default path to outputdir")
+    print("basis() --> openghginv_path")
+    print("basis_boundary_conditions() --> openghginv_path")
+    print("")
+    print("---- data_checks.py ----")
+    print("Make sure 'pint' is installed!")
+    print("")
+    print("---- example_run_rhime.py ----")
+    print("sys.path.append --> change to local dir of rhime-co2-inversions")
+    print("main() --> outputpath where inversion outputs are saved")
+    print("main() --> coutryfile name where PARIS country definitions file is saved")
+    print("")
+    print("---- get_co2_data.py ----")
+    print("sys.path.append --> change to local dir of rhime-co2-inversions")
+    print("")
+    print("---- rhime_co2.py ----")
+    print("sys.path.append --> change to local dir of rhime-co2-inversions")
+    print("")
+    print("---- sensitivity.py ----")
+    print("sys.path.append --> change to local dir of rhime-co2-inversions")
+    print("")
+    
+    
