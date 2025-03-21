@@ -1,10 +1,10 @@
-# *****************************************************************************
+# ---------------------------------------------------------------------------------------
 # get_co2_data.py
 # Created: 15 May 2024
 # Author: Eric Saboya, School of Geographical Sciences, University of Bristol
-# *****************************************************************************
+# ---------------------------------------------------------------------------------------
 # Functions for retrieving mole fraction datasets and creating simulations 
-# *****************************************************************************
+# ---------------------------------------------------------------------------------------
 
 import os
 import sys
@@ -19,7 +19,7 @@ import datetime as dt
 from openghg.types import SearchError
 from openghg.retrieve import get_flux, get_bc, get_obs_surface, get_footprint
 
-sys.path.append("/user/work/wz22079/projects/CO2/inversions_mk2/")
+sys.path.append("/user/work/wz22079/projects/rhime-co2-inversions/")
 
 from data_checks import create_unit_registry, check_obs_units
 
@@ -235,6 +235,7 @@ def get_mf_obs(obs_dict: dict,
             #    uploaded data over the averaging period. This accounts for the 
             #    variability in mole fractions over the averaging period.
 
+            
             # TO CHECK: variability for optical instruments, repeatability for ECD?
             if "mf_variability" in list(site_data_no_ave[site].keys()) and "mf_repeatability" in list(site_data_no_ave[site].keys()):
                 # Sampled mean error of mf_variability (not averaged)

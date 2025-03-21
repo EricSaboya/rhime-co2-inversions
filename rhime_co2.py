@@ -4,9 +4,9 @@
 # Author: Eric Saboya, School of Geographical Sciences, University of Bristol 
 # ---------------------------------------------------------------------------------------
 # RHIME CO2 inverse models
-# - rhime_inversions (mole fraction sectoral inversions)
-# - rhime_radiocarbon_pseudo (14CO2 sectoral inversions using pseudo observations)
-
+# > rhime_inversions (mole fraction sectoral inversions)
+# 
+# 
 # ---------------------------------------------------------------------------------------
 
 import os
@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Optional
 from collections import namedtuple
 
-sys.path.append("/user/work/wz22079/projects/CO2/inversions_mk2/")
+sys.path.append("/user/work/wz22079/projects/rhime-co2-inversions/")
 import utils
 from model_error_methods import model_error_method_parser
 import inversion_setup as setup
@@ -27,121 +27,6 @@ from get_co2_data import get_mf_obs_sims
 
 #from tracers_co2 import get_14c_obs_sims
 from inversion_mcmc import inferpymc, inferpymc_postprocessouts
-
-
-'''
-def rhime_14c(obs_dict: dict = None,
-              flux_dict: dict = None,
-              bc_dict: dict = None,
-              fp_dict: dict = None,
-              basis_dict: dict = None,
-              mcmc_dict: dict = None,
-              use_bc: bool = True,
-              nuclear_correction: bool = False,
-              c14_dict: dict = None,
-              model_error_method: str = None, 
-              sigma_freq: str = None,
-              outputname: str = None,
-              outputpath: str = None,
-              country_file: str = None,
-             ):
-    """
-    -------------------------------------------------------
-    Regional Hierarchical Inverse Modelling Environment 
-    - modified for using 14C tracers
-    -------------------------------------------------------
-    RHIME is a regional hierarchical Bayesian inverse 
-    model designed for inferrring fluxes from atmospheric
-    trace gas measurements and a priori flux data.
-    
-    Args:
-        obs_dict (dict | defaults to None):
-            Dictionary of parameters for retrieving 
-            observations.
-            
-        flux_dict (dict | defaults to None):
-            Dictionary of parameters for retrieving
-            fluxes.
-            
-        bc_dict (dict | defaults to None):
-            Dictionary of parameters for retrieving
-            boundary conditions.
-            
-        fp_dict (dict | defaults to None):
-            Dictionary of parameters for retreiving 
-            footprints.   
-            
-        basis_dict (dict | defaults to None):
-            Dictionary of basis function parameters
-            
-        mcmc_dict (dict | defaults to None):
-            Dictionary of MCMC function parameters
-            
-        use_bc (bool | defaults to True):
-            Option to use/solve for boundary conditions 
-            values in the inversion.
-            
-        nuclear_correction (bool | defaults to False):
-            Correct for nuclear power plant emissions
-            
-        c14_dict (dict | defaults to None):
-            Dictionary of C-14 parameters 
-            
-        model_error_method (str | defaults to None):
-            Specify model error calculation method.
-            One of:
-            > "residual"
-            > "fixed"
-            > "None" 
-            
-        sigma_freq (str | defaults to None):
-            Period over which the model error is estimated.
-            
-        bc_freq (str | defaults to None):
-            Period over which the baseline is estimated.
-            > "monthly": estimates BCs over one calendar month 
-            > "30D": estimates BCs over 30-days
-            > None: one BC for entire inversion period 
-            
-        outputname (str | defaults to None):
-            Unique identifier for output/run name
-            
-        outputpath (str | defaults to None):
-            Path of where output should be saved
-            
-        country_file (str | defaults to None):
-            Path to countryfile mask to be used 
-    -------------------------------------------------------
-    """
-    
-    # Get CO2 obs and create forward simulations (w./ Hall term for each sector)
-    (data_dict, 
-     sites, 
-     inlet, 
-     fp_height, 
-     instrument, 
-     averaging_period) = get_mf_obs_sims(flux_dict, 
-                                         fp_dict, 
-                                         obs_dict, 
-                                         bc_dict, 
-                                         use_bc,
-                                        )
-
-    # Calculate 14CO2 isofluxes
-    data_dict, resp_isoflux, disequil_isoflux = get_14c_obs_sims(data_dict,
-                                                                 c14_dict,
-                                                                 nuclear_correction,
-                                                                 emisource_to_sector,
-                                                                 start_date,
-                                                                 end_date,
-                                                                )
-
-    return data_dict
-    
-# ------------------------------------------------------------------------------# 
-'''
-
-
 
 
 def rhime_inversions(obs_dict: dict = None,
@@ -160,10 +45,11 @@ def rhime_inversions(obs_dict: dict = None,
     """
     -------------------------------------------------------
     Regional Hierarchical Inverse Modelling Environment 
-    -------------------------------------------------------
+
     RHIME is a regional hierarchical Bayesian inverse 
     model designed for inferrring fluxes from atmospheric
     trace gas measurements and a priori flux data.
+    -------------------------------------------------------
     Args:
         obs_dict (dict | defaults to None):
             Dictionary of parameters for retrieving 
@@ -248,7 +134,7 @@ def rhime_inversions(obs_dict: dict = None,
     if obs_dict["filters"] is not None:
         fp_data = utils.filtering(fp_data, obs_dict["filters"])
 
-    # Calculate Model errors
+    # Calculate model errors
     fp_data = model_error_method_parser(fp_data, 
                                         model_error_method,
                                        )
@@ -269,8 +155,8 @@ def rhime_inversions(obs_dict: dict = None,
         fp_data[site].attrs["Domain"] = fp_dict["domain"]
             
     # Mole fraction multi-sector inversions 
-    error = np.zeros(0)    # Observational / instrumental uncertainty 
-    Hbc = np.zeros(0)      # 
+    error = np.zeros(0)    # Observational uncertainty 
+    Hbc = np.zeros(0)      # Basis function dosage for model domain boundary [region]
     Hx = np.zeros(0)       # Basis function dosage [region[sector], t]
     Hxerr = np.zeros(0)    # Coefficient of variability of the dosage in each basis function [region[sector], t]
     Y = np.zeros(0)

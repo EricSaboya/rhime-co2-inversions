@@ -1,10 +1,10 @@
-# *****************************************************************************
+# ---------------------------------------------------------------------------------------
 # calculate_basis_functions.py
 # Created: 15 May 2024
 # Author: Eric Saboya, School of Geographical Sciences, University of Bristol
-# *****************************************************************************
+# ---------------------------------------------------------------------------------------
 # Functions for calculating basis functions for CO2 data sets
-# *****************************************************************************
+# ---------------------------------------------------------------------------------------
 
 import os
 import glob
@@ -83,8 +83,9 @@ class quadTreeNode:
 
 def quadTreeGrid(grid, limit):
     """
+    -------------------------------------------------------
     Apply quadtree division algorithm
-    -----------------------------------
+    -------------------------------------------------------
     Args:
       grid (array):
         2d numpy array to apply quadtree division to
@@ -97,7 +98,7 @@ def quadTreeGrid(grid, limit):
         each  box from boxList
       boxList: (list of lists)
         Each sublist describes the corners of a quadtree leaf
-    -----------------------------------
+    -------------------------------------------------------
     """
     # start with a single node the size of the entire input grid:
     parentNode = quadTreeNode(0, grid.shape[0], 0, grid.shape[1])
@@ -127,6 +128,7 @@ def quadtreebasisfunction(
     nbasis=50,
 ):
     """
+    -------------------------------------------------------
     Creates a basis function with nbasis grid cells using a quadtree algorithm.
     The domain is split with smaller grid cells for regions which contribute
     more to the a priori (above basline) mole fraction. This is based on the
@@ -136,7 +138,7 @@ def quadtreebasisfunction(
     The number of basis functions is optimised using dual annealing. Probably
     not the best or fastest method as there should only be one minima, but doesn't
     require the Jacobian or Hessian for optimisation.
-    -----------------------------------
+    -------------------------------------------------------
     Args:
       emissions_name (list):
         List of "source" key words as used for retrieving specific emissions
@@ -165,7 +167,7 @@ def quadtreebasisfunction(
     Returns:
         If outputdir is None, then returns a Temp directory. The new basis function is saved in this Temp directory.
         If outputdir is not None, then does not return anything but saves the basis function in outputdir.
-    -----------------------------------
+    -------------------------------------------------------
     """
     if emissions_name == None:
         raise ValueError("emissions_name needs to be specified")
@@ -259,11 +261,13 @@ def quadtreebasisfunction(
 # BUCKET BASIS FUNCTIONS
 def load_landsea_indices():
     """
+    -------------------------------------------------------
     Load UKMO array with indices that separate
     land and sea regions in EUROPE domain
-    --------------
+    -------------------------------------------------------
     land = 1
     sea = 0
+    -------------------------------------------------------
     """
     landsea_indices = xr.open_dataset("/user/work/wz22079/country_masks/country-EUROPE-UKMO-landsea-2023.nc")
     return landsea_indices["country"].values
