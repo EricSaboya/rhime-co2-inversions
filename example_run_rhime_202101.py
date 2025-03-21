@@ -15,7 +15,7 @@
 import sys 
 import pickle
 import numpy as np
-sys.path.append("/user/work/wz22079/projects/CO2/inversions_mk2/")
+sys.path.append("/user/work/wz22079/projects/rhime-co2-inversions/")
 import rhime_co2
 
 def inputs():
