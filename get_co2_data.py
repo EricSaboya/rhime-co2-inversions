@@ -408,51 +408,19 @@ def get_mf_obs_sims(flux_dict: dict,
                                                                flux=data_dict[".flux"],
                                                                bc=data_dict[".bc"],
                                                               )
+                split_by_sector = len(flux_dict["source"]) > 1
+                scenario_combined = model_scenario.footprints_data_merge(calc_fp_x_flux=True, split_by_sector=split_by_sector)
 
-                if len(flux_dict["source"]) == 1:
-                    scenario_combined = model_scenario.footprints_data_merge()
-                    if str(obs_dict["species"]).lower() == "co2":
-                        Hall_t, Hall_yxt = model_scenario._calc_modelled_obs_HiTRes(sources=flux_dict["source"],
-                                                                                    averaging=obs_dict["averaging_period"][site_ind],
-                                                                                    output_fpXflux=True,
-                                                                                   )
-                        scenario_combined["Hall"] = Hall_yxt
-                    else:
-                        Hall_t, Hall_yxt = model_scenario.calc_modelled_obs(sources=flux_dict["source"],
-                                                                            averaging=obs_dict["averaging_period"][site_ind],
-                                                                            output_fpXflux=True,
-                                                                           )
-                        scenario_combined["Hall"] = Hall_yxt
+                # HACK to make new results of `footprints_data_merge` match previous format used here
+                if "source" in scenario_combined.dims:
+                    mf_mod_var = "mf_mod_sectoral" if "mf_mod_sectoral" in scenario_combined.dims else "mf_mod_high_res_sectoral"
 
+                    for s in scenario_combined.source:
+                        scenario_combined[f"mf_mod_{s}"] = scenario_combined[mf_mod_var].sel(source=s, drop=True)
+                        scenario_combined[f"Hall_{s}"] = scenario_combined.fp_x_flux_sectoral.sel(source=s, drop=True)
 
-                elif len(flux_dict["source"]) > 1:
-                    model_scenario_dict = {}
-                    for source in flux_dict["source"]:
-                        scenario_sector = model_scenario.footprints_data_merge(sources=source, 
-                                                                               recalculate=True,
-                                                                              )
-                        if fp_dict["species"].lower() == "co2":
-                            Hall_t, Hall_yxt = model_scenario._calc_modelled_obs_HiTRes(sources=source,
-                                                                                        averaging=obs_dict["averaging_period"][site_ind],
-                                                                                        output_fpXflux=True,
-                                                                                       )
-                        
-                            model_scenario_dict[f"mf_mod_high_res_{source}"] = scenario_sector["mf_mod_high_res"]
-                            model_scenario_dict[f"Hall_{source}"] = Hall_yxt
-                    
-                        elif fp_dict["species"].lower() != "co2":
-                            Hall_t, Hall_yxt = model_scenario.calc_modelled_obs(sources=source,
-                                                                                averaging=obs_dict["averaging_period"][site_ind],
-                                                                                output_fpXflux=True,
-                                                                               )
-                        
-                            model_scenario_dict[f"mf_mod_{source}"] = scenario_sector["mf_mod"]
-                            model_scenario_dict[f"Hall_{source}"] = Hall_yxt
+                    scenario_combined = scenario_combined.drop_vars([mf_mod_var, "fp_x_flux_sectoral"])
 
-                    scenario_combined = model_scenario.footprints_data_merge(recalculate=True)
-                    for k, v in model_scenario_dict.items():
-                        scenario_combined[k] = v
-            
                 data_dict[site] = scenario_combined
                 # data_dict[site].bc_mod.values *= 1e-3 # convert from ppb (default in openghg) to ppm
                 data_dict[site].bc_mod.values *= 1e-9 # convert from ppb (default in openghg) to mol/mol
