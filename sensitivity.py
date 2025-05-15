@@ -22,7 +22,7 @@ import convert
 import calculate_basis_functions as cbf
 from importlib import reload
 
-sys.path.append("/user/work/wz22079/projects/CO2/inversions_mk2/")
+sys.path.append("/home/users/alice.ramsden/rhime-co2-inversions")
 
 from utils import combine_datasets, load_json, synonyms
 

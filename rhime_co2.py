@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Optional
 from collections import namedtuple
 
-sys.path.append("/user/work/wz22079/projects/rhime-co2-inversions/")
+sys.path.append("/home/users/alice.ramsden/rhime-co2-inversions")
 import utils
 from model_error_methods import model_error_method_parser
 import inversion_setup as setup

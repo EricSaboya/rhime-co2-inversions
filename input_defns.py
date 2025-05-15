@@ -92,7 +92,7 @@ def rhime_co2_dictionary_keys():
                      "c14_gpp_sig": {"additive_bias":      "Additive bias to apply to the GPP c14 signature",
                                     },
             
-                     "c14_bg": {"additive_bias":           "Additive bias to apply to the basckground c14 signature",,
+                     "c14_bg": {"additive_bias":           "Additive bias to apply to the basckground c14 signature",
                                },
                      
                      "c14_nuclear" : {"source": "", 

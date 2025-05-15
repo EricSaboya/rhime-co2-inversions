@@ -19,7 +19,7 @@ import datetime as dt
 from openghg.types import SearchError
 from openghg.retrieve import get_flux, get_bc, get_obs_surface, get_footprint
 
-sys.path.append("/user/work/wz22079/projects/rhime-co2-inversions/")
+sys.path.append("/home/users/alice.ramsden/rhime-co2-inversions")
 
 from data_checks import create_unit_registry, check_obs_units
 

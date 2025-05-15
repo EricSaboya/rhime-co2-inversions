@@ -269,7 +269,7 @@ def load_landsea_indices():
     sea = 0
     -------------------------------------------------------
     """
-    landsea_indices = xr.open_dataset("/user/work/wz22079/country_masks/country-EUROPE-UKMO-landsea-2023.nc")
+    landsea_indices = xr.open_dataset("/data/users/alice.ramsden/LPDM_co2/countries/country-EUROPE-UKMO-landsea-2023.nc")
     return landsea_indices["country"].values
 
 def bucket_value_split(grid, bucket, offset_x=0, offset_y=0):
@@ -620,7 +620,7 @@ def bucketbasisfunction(emissions_name: (str, list),
 
     if outputdir is None:
         # cwd = os.getcwd()
-        cwd = "/user/home/wz22079/my_openghg/openghg_inversions/scratch/"
+        cwd = "/data/users/alice.ramsden/co2_inversions/"
         tempdir = os.path.join(cwd, f"Temp_{str(uuid.uuid4())}")
         os.mkdir(tempdir)
         os.mkdir(os.path.join(tempdir, f"{domain}/"))
@@ -672,7 +672,7 @@ def basis(domain: str,
     """
     from utils import read_netcdfs
     
-    openghginv_path = "/user/home/wz22079/my_openghg/openghg_inversions/scratch/"
+    openghginv_path = "/data/users/alice.ramsden/co2_inversions"
     
     if basis_directory is None:
         if not os.path.exists(os.path.join(openghginv_path, "basis_functions/")):
@@ -723,7 +723,7 @@ def basis_boundary_conditions(domain: str,
     """
     from utils import read_netcdfs
     
-    openghginv_path = "/user/home/wz22079/my_openghg/openghg_inversions/scratch/"
+    openghginv_path = "/data/users/alice.ramsden/co2_inversions/"
 
     if bc_basis_directory is None:
         if not os.path.exists(os.path.join(openghginv_path, "bc_basis_functions/")):
