@@ -1177,7 +1177,10 @@ def get_country(domain, country_file=None):
         #             name=np.asarray(name_temp)
 
         #         else:
-        name = f.variables["name"].values.astype(str)
+        
+        # name = f.variables["name"].values.astype(str)
+        
+        name = f.variables["country_code"].values.astype(str)
 
     result = dict(
         lon=lon,

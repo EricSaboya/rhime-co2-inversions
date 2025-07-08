@@ -1,10 +1,10 @@
-# ---------------------------------------------------------------------------------------
+# *****************************************************************************
 # calculate_basis_functions.py
 # Created: 15 May 2024
 # Author: Eric Saboya, School of Geographical Sciences, University of Bristol
-# ---------------------------------------------------------------------------------------
+# *****************************************************************************
 # Functions for calculating basis functions for CO2 data sets
-# ---------------------------------------------------------------------------------------
+# *****************************************************************************
 
 import os
 import glob
@@ -83,9 +83,8 @@ class quadTreeNode:
 
 def quadTreeGrid(grid, limit):
     """
-    -------------------------------------------------------
     Apply quadtree division algorithm
-    -------------------------------------------------------
+    -----------------------------------
     Args:
       grid (array):
         2d numpy array to apply quadtree division to
@@ -98,7 +97,7 @@ def quadTreeGrid(grid, limit):
         each  box from boxList
       boxList: (list of lists)
         Each sublist describes the corners of a quadtree leaf
-    -------------------------------------------------------
+    -----------------------------------
     """
     # start with a single node the size of the entire input grid:
     parentNode = quadTreeNode(0, grid.shape[0], 0, grid.shape[1])
@@ -128,7 +127,6 @@ def quadtreebasisfunction(
     nbasis=50,
 ):
     """
-    -------------------------------------------------------
     Creates a basis function with nbasis grid cells using a quadtree algorithm.
     The domain is split with smaller grid cells for regions which contribute
     more to the a priori (above basline) mole fraction. This is based on the
@@ -138,7 +136,7 @@ def quadtreebasisfunction(
     The number of basis functions is optimised using dual annealing. Probably
     not the best or fastest method as there should only be one minima, but doesn't
     require the Jacobian or Hessian for optimisation.
-    -------------------------------------------------------
+    -----------------------------------
     Args:
       emissions_name (list):
         List of "source" key words as used for retrieving specific emissions
@@ -167,7 +165,7 @@ def quadtreebasisfunction(
     Returns:
         If outputdir is None, then returns a Temp directory. The new basis function is saved in this Temp directory.
         If outputdir is not None, then does not return anything but saves the basis function in outputdir.
-    -------------------------------------------------------
+    -----------------------------------
     """
     if emissions_name == None:
         raise ValueError("emissions_name needs to be specified")
@@ -261,13 +259,11 @@ def quadtreebasisfunction(
 # BUCKET BASIS FUNCTIONS
 def load_landsea_indices():
     """
-    -------------------------------------------------------
     Load UKMO array with indices that separate
     land and sea regions in EUROPE domain
-    -------------------------------------------------------
+    --------------
     land = 1
     sea = 0
-    -------------------------------------------------------
     """
     landsea_indices = xr.open_dataset("/user/work/wz22079/country_masks/country-EUROPE-UKMO-landsea-2023.nc")
     return landsea_indices["country"].values
@@ -317,7 +313,7 @@ def get_nregions(bucket, grid):
     """Returns no. of basis functions for bucket value"""
     return np.max(bucket_split_landsea_basis(grid, bucket))
 
-def optimize_nregions(bucket, grid, nregion, tol, max_iter=2000):
+def optimize_nregions(bucket, grid, nregion, tol, max_iter=4000):
     """
     Optimize bucket value to obtain nregion basis functions within +/- tol.
     """
@@ -343,23 +339,6 @@ def optimize_nregions(bucket, grid, nregion, tol, max_iter=2000):
 
     # Return the last computed bucket if convergence wasn't achieved
     return bucket
-
-# def optimize_nregions(bucket, grid, nregion, tol):
-#     """
-#     Optimize bucket value to obtain nregion basis functions
-#     within +/- tol.
-#     """
-#     # print(bucket, get_nregions(bucket, grid))
-#     if get_nregions(bucket, grid) <= nregion + tol and get_nregions(bucket, grid) >= nregion - tol:
-#         return bucket
-
-#     if get_nregions(bucket, grid) < nregion + tol:
-#         bucket = bucket * 0.995
-#         return optimize_nregions(bucket, grid, nregion, tol)
-
-#     elif get_nregions(bucket, grid) > nregion - tol:
-#         bucket = bucket * 1.005
-#         return optimize_nregions(bucket, grid, nregion, tol)
 
 def bucket_split_landsea_basis(grid, bucket, offset_x=0, offset_y=0):
     """
@@ -438,7 +417,312 @@ def nregion_landsea_basis(grid, bucket=1, nregion=100, tol=1, offset_x=0, offset
     return basis_function
 
 
-def bucketbasisfunction(emissions_name: (str, list),
+def bucketbasisfunction(data_dict: dict,
+                        start_date: dict,
+                        domain: str,
+                        species: str,
+                        outputname: str,
+                        outputdir: str,
+                        nbasis: str
+                        ):
+    """_summary_
+
+    Args:
+        data_dict (dict): _description_
+        start_date (dict): _description_
+        domain (str): _description_
+        species (str): _description_
+        outputname (str): _description_
+        outputdir (str): _description_
+        nbasis (str): _description_
+    """
+    # Get site names and flux sectors
+    sites = [key for key in data_dict.keys() if "." not in key]
+    flux_sectors = data_dict[sites[0]]["source"].values
+    n_flux_sectors = len(flux_sectors)
+    
+    basis_per_sector = {}
+    
+    if type(nbasis) in [int, float]:
+        nbasis = [int(nbasis)]
+        print("Calculating flux basis function grid for mean footprint x summed fluxes ...")
+        
+        # Calculate mean sensitivity fp x flux field for measurement network being used
+        for i, site in enumerate(sites):
+            if i==0:
+                mean_fp_x_flux = data_dict[site]["fp_x_flux"].mean(dim="time").copy()
+            else:
+                mean_fp_x_flux += data_dict[site]["fp_x_flux"].mean(dim="time")
+        # mean_fp_x_flux = mean_fp_x_flux/len(sites)
+        mean_fp_x_flux_t = mean_fp_x_flux/len(sites)
+        
+        # Calculate time-averaged fp x flux field -> [lat, lon]
+        #   f: R2 x [t0, tn] -> R2
+        # mean_fp_x_flux_t = xr.DataArray.mean(mean_fp_x_flux, dim="time")
+
+        print("Calculating proportion of mean footprint x flux field in model domain ...")
+        fps_nonzero_inds = np.where(mean_fp_x_flux_t!=0)
+        prop = [len(fps_nonzero_inds[0])/mean_fp_x_flux_t.size]
+
+    elif type(nbasis) is list:
+        # TO DO 
+        # Add option to check length of nbasis matches number of sources
+        print("Calculating flux basis function grid for mean footprint x individual flux sector ...")
+        
+        for i, site in enumerate(sites):
+            if i==0:
+                mean_fp_x_flux = data_dict[site]["fp_x_flux_sectoral"].copy()
+            else:
+                mean_fp_x_flux += data_dict[site]["fp_x_flux_sectoral"]
+        mean_fp_x_flux = mean_fp_x_flux/len(sites)
+        
+        # Calculate time-averaged fp x flux field for each sector -> [source, lat, lon]
+        #   f: I x R2 x [t0, tn] -> R3
+        mean_fp_x_flux_t = xr.DataArray.mean(mean_fp_x_flux, dim="time")
+        
+        prop = []
+        print("Calculating proportion of mean footprint x flux field in model domain ...")
+        for f_sector in flux_sectors:
+            fps = mean_fp_x_flux_t.sel({"source": f_sector})
+            fps_nonzero_inds = np.where(fps!=0)
+            prop.append(len(fps_nonzero_inds[0])/fps.size)
+            
+
+    # Case 1: Single basis function value applied to all sectors
+    if len(nbasis)==1:
+        print(f"Calculating flux basis functions for net flux using {nbasis[0]} basis functions ...")
+        print(f"Footprint x flux covers {prop[0]*100} % of the model domain")
+        if prop[0] > 0.55:
+            print("Calculating flux basis functions over entire model domain")
+            
+            # Use median grid value as starting point for bucket value 
+            starting_bucket_value = np.nanmedian(mean_fp_x_flux_t)
+            bucket_basis_i = nregion_landsea_basis(mean_fp_x_flux_t.values, starting_bucket_value, nbasis[0])
+            
+            for f_sector in flux_sectors:
+                basis_per_sector[f_sector] = np.expand_dims(bucket_basis_i, axis=2)
+            
+        else:
+            print("Calculating flux basis functions over an inner domain")
+            
+            # Find sub-domain where fluxes exist
+            i_min, i_max = np.nanmin(fps_nonzero_inds[0]), np.nanmax(fps_nonzero_inds[0])
+            j_min, j_max = np.nanmin(fps_nonzero_inds[1]), np.nanmax(fps_nonzero_inds[1])
+
+            n, m = mean_fp_x_flux_t.shape[0], mean_fp_x_flux_t.shape[1]
+            
+            # Inner region where values exist
+            fps_inner = mean_fp_x_flux_t[i_min:i_max+1, j_min:j_max+1]
+            starting_bucket_value = np.nanmedian(fps_inner)
+            
+            # Use median grid value as starting point for bucket value 
+            bucket_basis_i = nregion_landsea_basis(fps_inner.values, 
+                                                   starting_bucket_value, 
+                                                   nbasis[0], 
+                                                   1, 
+                                                   j_min, 
+                                                   i_min,
+                                                  )
+
+            new_basis_grid = np.zeros(mean_fp_x_flux_t.shape)
+            
+            # Example of inner region among outer regions
+            # | ------------------- |
+            # | 111 | 222 | 333 333 |
+            # | --- | --- | ------- |
+            # | 444 | iii | 555 555 |
+            # | --- | --- | ------- |
+            # | 666 | 777 | 888 888 | 
+            # | 666 | 777 | 888 888 |
+            # | ------------------- |
+             
+            # region 1
+            # for k in range(0, i_min):
+                # for j in range(0, j_min):
+            new_basis_grid[0:i_min, 0:j_min] = 1 + bucket_basis_i.max()
+            print("Region 1 completed")
+                
+            # region 2
+            # for k in range(i_min, i_max):
+                # for j in range(0, j_min):
+            new_basis_grid[i_min:i_max, 0:j_min] = 2 + bucket_basis_i.max()
+            print("Region 2 completed")
+                
+            # region 3
+            # for k in range(i_max, n):
+                # for j in range(0, j_min):
+            new_basis_grid[i_max:n, 0:j_min] = 3 + bucket_basis_i.max()
+            print("Region 3 completed")
+                
+            # region 4
+            # for k in range(0, i_min):
+                # for j in range(j_min, j_max):
+            new_basis_grid[0:i_min, j_min:j_max] = 4 + bucket_basis_i.max()
+            print("Region 4 completed")
+            
+            # region 5
+            # for k in range(i_max, n):
+                # for j in range(j_min, j_max):
+            new_basis_grid[i_max:n, j_min:j_max] = 5 + bucket_basis_i.max()
+            print("Region 5 completed")
+            
+            # region 6
+            # for k in range(0, i_min):
+                # for j in range(j_max, m):
+            new_basis_grid[0:i_min, j_max:m] = 6 + bucket_basis_i.max()
+            print("Region 6 completed")
+            
+            # region 7
+            # for k in range(i_min, i_max):
+                # for j in range(j_max, m):
+            new_basis_grid[i_min:i_max, j_max:m] = 7 + bucket_basis_i.max()
+            print("Region 7 completed")
+            
+            # region 8
+            # for k in range(i_max, n):
+                # for j in range(j_max, m):
+            new_basis_grid[i_max:n, j_max:m] = 8 + bucket_basis_i.max()
+            print("Region 8 completed")
+            
+            # Inner region
+            for k in range(i_min, i_max):
+                for j in range(j_min, j_max):
+                    new_basis_grid[k,j] = bucket_basis_i[k-i_min, j-j_min]
+            print("Inner region completed")
+            
+
+
+            # Add sector basis function to dict
+            for f_sector in flux_sectors:
+                basis_per_sector[f_sector] = np.expand_dims(new_basis_grid, axis=2)
+    
+    # Case 2: Calculate flux basis function grids for each flux sector separately            
+    else:
+        for n in range(len(nbasis)):
+            print(f"Calculating flux basis functions for {flux_sectors[n]} flux using {nbasis[n]} basis functions ...")
+            print(f"Footprint x flux covers {prop[n]*100} % of the model domain")
+            if prop[n] > 0.55:
+                print("Calculating flux basis functions over entire model domain")
+            
+                # Use median grid value as starting point for bucket value 
+                f_sector = flux_sectors[n]
+                mean_fp_x_flux_t_source = mean_fp_x_flux_t.sel({"source": f_sector})
+                starting_bucket_value = np.nanmedian(mean_fp_x_flux_t_source)
+                bucket_basis_i = nregion_landsea_basis(mean_fp_x_flux_t_source.values, starting_bucket_value, nbasis[n])
+                basis_per_sector[f_sector] = np.expand_dims(bucket_basis_i, axis=2)
+
+            else:
+                print("Calculating flux basis functions over an inner domain")
+                f_sector = flux_sectors[n]
+                fps = mean_fp_x_flux_t.sel({"source": f_sector})
+                fps_nonzero_inds = np.where(fps!=0)
+            
+                # Find sub-domain where fluxes exist
+                i_min, i_max = np.nanmin(fps_nonzero_inds[0]), np.nanmax(fps_nonzero_inds[0])
+                j_min, j_max = np.nanmin(fps_nonzero_inds[1]), np.nanmax(fps_nonzero_inds[1])
+
+                n, m = fps.shape[0], fps.shape[1]
+            
+                # Inner region where values exist
+                fps_inner = fps[i_min:i_max+1, j_min:j_max+1]
+                starting_bucket_value = np.nanmedian(fps_inner)
+            
+                # Use median grid value as starting point for bucket value 
+                bucket_basis_i = nregion_landsea_basis(fps_inner, 
+                                                       starting_bucket_value, 
+                                                       nbasis[0], 
+                                                       1, 
+                                                       j_min, 
+                                                       i_min,
+                                                      )
+
+                new_basis_grid = np.zeros(fps.shape)
+            
+                # region 1
+                for k in range(0, i_min):
+                    for j in range(0, j_min):
+                        new_basis_grid[k,j] = 1 + bucket_basis_i.max()
+                # region 2
+                for k in range(i_min, i_max):
+                    for j in range(0, j_min):
+                        new_basis_grid[k,j] = 2 + bucket_basis_i.max()
+                # region 3
+                for k in range(i_max, n):
+                    for j in range(0, j_min):
+                        new_basis_grid[k,j] = 3 + bucket_basis_i.max()
+                # region 4
+                for k in range(0, i_min):
+                    for j in range(j_min, j_max):
+                        new_basis_grid[k,j] = 4 + bucket_basis_i.max()
+                # region 5
+                for k in range(i_max, n):
+                    for j in range(j_min, j_max):
+                        new_basis_grid[k,j] = 5 + bucket_basis_i.max()
+                # region 6
+                for k in range(0, i_min):
+                    for j in range(j_max, m):
+                        new_basis_grid[k,j] = 6 + bucket_basis_i.max()
+                # region 7
+                for k in range(i_min, i_max):
+                    for j in range(j_max, m):
+                        new_basis_grid[k,j] = 7 + bucket_basis_i.max()
+                # region 8
+                for k in range(i_max, n):
+                    for j in range(j_max, m):
+                        new_basis_grid[k,j] = 8 + bucket_basis_i.max()
+                # Inner region
+                for k in range(i_min, i_max):
+                    for j in range(j_min, j_max):
+                        new_basis_grid[k,j] = bucket_basis_i[k-i_min, j-j_min]
+
+                # Add sector basis function to dict
+                basis_per_sector[f_sector] = np.expand_dims(new_basis_grid, axis=2)
+      
+    lon = data_dict[sites[0]].lon.values
+    lat = data_dict[sites[0]].lat.values
+    time = [pd.to_datetime(start_date)]
+    
+    base = []
+    for key in basis_per_sector.keys():
+        base.append(basis_per_sector[key])
+    base = np.array(base)
+
+    # Create xarray dataset with basis function per sector
+    #  TO DO 
+    # Update 'sector' to 'source' to align with OpenGHG updates
+    newds = xr.Dataset({"basis": (["sector", "lat", "lon", "time"], base)},
+                        coords = {"time": (["time"], time),
+                                  "lat": (["lat"], lat),
+                                  "lon": (["lon"], lon),
+                                  "sector": (["sector"], flux_sectors),
+                                 })
+
+    newds.lat.attrs["long_name"] = "latitude"
+    newds.lon.attrs["long_name"] = "longitude"
+    newds.lat.attrs["units"] = "degrees_north"
+    newds.lon.attrs["units"] = "degrees_east"
+    newds.attrs["creator"] = getpass.getuser()
+    newds.attrs["date created"] = str(pd.Timestamp.today())
+
+    if outputdir is None:
+        # cwd = os.getcwd()
+        cwd = "/user/home/wz22079/my_openghg/openghg_inversions/scratch/"
+        tempdir = os.path.join(cwd, f"Temp_{str(uuid.uuid4())}")
+        os.mkdir(tempdir)
+        os.mkdir(os.path.join(tempdir, f"{domain}/"))
+        newds.to_netcdf(os.path.join(tempdir, domain, f"weighted_co2-{outputname}_{domain}_{start_date.split('-')[0]}{start_date.split('-')[1]}.nc"), mode="w")
+        return tempdir
+
+    else:
+        basisoutpath = os.path.join(outputdir, domain)
+        if not os.path.exists(basisoutpath):
+            os.makedirs(basisoutpath)
+        newds.to_netcdf(os.path.join(basisoutpath, f"weighted_co2-{outputname}_{domain}_{start_date.split('-')[0]}{start_date.split('-')[1]}.nc"), mode='w')
+        return outputdir
+
+
+
+def _bucketbasisfunction(emissions_name: (str, list),
                         data_dict: dict,
                         sites: (str, list),
                         start_date: str,
@@ -499,20 +783,34 @@ def bucketbasisfunction(emissions_name: (str, list),
         meanfp += data_dict[site].fp.mean(dim="time").values
     meanfp /= len(sites)
 
+    for i, key in enumerate(data_dict[".flux"].keys()):
+        if i == 0:
+            flux_total = xr.DataArray.mean(data_dict[".flux"][key].data.flux, dim="time").values.copy()
+        else:
+            flux_total += xr.DataArray.mean(data_dict[".flux"][key].data.flux, dim="time").values
+    flux_i = flux_total
+
     # Calculate basis function per flux sector 
     print("Using absolute values of fluxes to calculate basis functions")
     for i in range(0, nsectors):
-        flux_i = data_dict[".flux"][emissions_name[i]].data.flux
-        absflux = np.absolute(flux_i)
+        # flux_i = data_dict[".flux"][emissions_name[i]].data.flux
+        # absflux = np.absolute(flux_i)
+
+        print("Mean footprint shape", meanfp.shape)
+        print("Mean flux shape", flux_i.shape)
+        
+        absflux = flux_i
                 
         if absflux.shape != meanfp.shape:
-            meanflux = xr.DataArray.mean(absflux, dim="time")
-            print(meanflux.shape)
-            
+            meanflux = np.mean(absflux, axis=0)
+            # meanflux = xr.DataArray.mean(absflux, dim="time")            
             if meanflux.shape == meanfp.shape:
-                fps = meanfp * meanflux.values
+                fps = meanfp * meanflux
             else:
                 raise ValueError("Footprint and Flux dimensions do not match.")
+        else:
+            meanflux = absflux
+            fps = meanfp * meanflux
 
         # Check whether a significant proportion of the fps domain has zero values
         # If so, apply basis functions to region where fluxes exist
@@ -823,19 +1121,17 @@ def basis_functions_wrapper(data_dict: dict,
                 "Basis algorithm not recognised. Please use either 'quadtree' or 'weighted', or input a basis function file"
             ) from e
         print(f"Using {basis_function.description} to derive basis functions.")
-
         
-        tempdir = basis_function.algorithm(source,
-                                           data_dict, 
-                                           site,
-                                           start_date,
-                                           domain,
-                                           "CO2",
-                                           outputname,
-                                           outputpath,
-                                           nbasis,
-                                          )
-
+        tempdir = basis_function.algorithm(
+            data_dict=data_dict, 
+            start_date=start_date,
+            domain=domain,
+            species="CO2",
+            outputname=outputname,
+            outputdir=outputpath,
+            nbasis=nbasis,
+        )
+        
         fp_basis_case = "weighted_co2-" + outputname
         basis_directory = tempdir
                                                                                                

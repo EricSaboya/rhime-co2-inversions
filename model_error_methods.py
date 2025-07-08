@@ -49,16 +49,31 @@ def no_model_error(sites: list,
     return data_dict
 
 def fixed_method(sites: list,
-                 data_dict: dict,
+                 my_data_dict: dict,
                 ):
     """
     Model error based on the mean obs-sim 
     difference 
     """
     for site in sites:
-        y_epsilon_m = np.abs(np.nanmean(fp_data[site].mf - fp_data[site].mf_mod_high_res - fp_data[site].bc_mod))
-        data_dict[site]["y_model_err"] = (data_dict[site].mf * 0.0) + y_epsilon_m
-    return data_dict
+        if np.mean(my_data_dict[site]["bc_mod"] * 1e6) < 0.4:
+            my_data_dict[site]["bc_mod"].values *= 1e9
+        
+        y_epsilon_m = np.abs(np.nanmean(my_data_dict[site].mf - (my_data_dict[site].mf_mod_high_res + my_data_dict[site].bc_mod)))
+        my_data_dict[site]["y_model_err"] = (my_data_dict[site].mf.copy() * 0.0) + y_epsilon_m
+    return my_data_dict
+
+# def fixed_method(sites: list,
+#                  data_dict: dict,
+#                 ):
+#     """
+#     Model error based on the mean obs-sim 
+#     difference 
+#     """
+#     for site in sites:
+#         y_epsilon_m = np.abs(np.nanmean(data_dict[site].mf - (data_dict[site].mf_mod_high_res + data_dict[site].bc_mod)))
+#         data_dict[site]["y_model_err"] = (data_dict[site].mf.copy() * 0.0) + y_epsilon_m
+#     return data_dict
 
 def residual_method(sites: list, 
                     data_dict: dict,

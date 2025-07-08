@@ -1,10 +1,10 @@
-# ---------------------------------------------------------------------------------------
+# *****************************************************************************
 # get_co2_data.py
 # Created: 15 May 2024
 # Author: Eric Saboya, School of Geographical Sciences, University of Bristol
-# ---------------------------------------------------------------------------------------
-# Functions for retrieving mole fraction datasets and creating simulations 
-# ---------------------------------------------------------------------------------------
+# *****************************************************************************
+# Functions for retrieving mole fraction datasets and creating simulations
+# *****************************************************************************
 
 import os
 import sys
@@ -19,29 +19,29 @@ import datetime as dt
 from openghg.types import SearchError
 from openghg.retrieve import get_flux, get_bc, get_obs_surface, get_footprint
 
-sys.path.append("/user/work/wz22079/projects/rhime-co2-inversions/")
+sys.path.append("/user/work/wz22079/projects/CO2/inversions_mk2/")
 
 from data_checks import create_unit_registry, check_obs_units
 
 
-def get_fps_data(fp_dict: dict)->dict:
+def get_fps_data(fp_dict: dict) -> dict:
     """
     -------------------------------------------------------
     Retrieve footprints for each site
     -------------------------------------------------------
     Args:
-        fp_dict (dict): 
+        fp_dict (dict):
             Dictionary of footprints data specifications
-            Keys: 'site', 
-                  'fp_height', 
-                  'domain', 
+            Keys: 'site',
+                  'fp_height',
+                  'domain',
                   'species',
-                  'start_date', 
-                  'end_date', 
+                  'start_date',
+                  'end_date',
                   'store'
-    
+
     Returns:
-        Dictionary of OpenGHG footprint objects for each 
+        Dictionary of OpenGHG footprint objects for each
         site
     -------------------------------------------------------
     """
@@ -50,118 +50,147 @@ def get_fps_data(fp_dict: dict)->dict:
 
     for i, site in enumerate(sites):
         try:
-            get_fps_data = get_footprint(site=fp_dict["site"][i],                            
-                                         height=fp_dict["fp_height"][i],
-                                         domain=fp_dict["domain"],
-                                         start_date=fp_dict["start_date"],
-                                         end_date=fp_dict["end_date"],
-                                         store=fp_dict["store"],
-                                         species=fp_dict["species"],
-                                        )
+            if "model" in fp_dict.keys():
+                get_fps_data = get_footprint(
+                    site=fp_dict["site"][i],
+                    height=fp_dict["fp_height"][i],
+                    domain=fp_dict["domain"],
+                    start_date=fp_dict["start_date"],
+                    end_date=fp_dict["end_date"],
+                    store=fp_dict["store"],
+                    species=fp_dict["species"],
+                    model=fp_dict["model"],
+                )
+
+            else:
+                get_fps_data = get_footprint(
+                    site=fp_dict["site"][i],
+                    height=fp_dict["fp_height"][i],
+                    domain=fp_dict["domain"],
+                    start_date=fp_dict["start_date"],
+                    end_date=fp_dict["end_date"],
+                    store=fp_dict["store"],
+                    species=fp_dict["species"],
+                )
+
             fps_out_dict[site] = get_fps_data
-            
+
         except SearchError:
             print(f"\nNo footprint data found for {site}.\n")
             continue  # skip this site
     return fps_out_dict
 
-def get_flux_data(flux_dict: dict)->dict:
+
+def get_flux_data(flux_dict: dict) -> dict:
     """
     -------------------------------------------------------
-    Retrieve flux fields and apply any scaling factors to 
+    Retrieve flux fields and apply any scaling factors to
     the flux values
     -------------------------------------------------------
     Args:
         flux_dict (dict)
             Dictionary of flux data specifications
-            Keys: 'species', 
-                  'source', 
-                  'domain', 
+            Keys: 'species',
+                  'source',
+                  'domain',
                   'flux_sf',
-                  'start_date', 
-                  'end_date', 
+                  'start_date',
+                  'end_date',
                   'store'
-    
+
     Returns:
         Dictionary of OpenGHG flux data objects for each
-        source 
+        source
     -------------------------------------------------------
     """
     flux_data_dict = {}
     for i, source in enumerate(flux_dict["source"]):
-        get_flux_data = get_flux(species=flux_dict["species"],
-                                 domain=flux_dict["domain"],
-                                 source=source,
-                                 start_date=flux_dict["start_date"],
-                                 end_date=flux_dict["end_date"],
-                                 store=flux_dict["store"],
-                                )
-        
-        # Apply any scale factors to flux fields 
-        if "flux_sf" in list(flux_dict.keys()): 
+        get_flux_data = get_flux(
+            species=flux_dict["species"],
+            domain=flux_dict["domain"],
+            source=source,
+            start_date=flux_dict["start_date"],
+            end_date=flux_dict["end_date"],
+            store=flux_dict["store"],
+        )
+
+        # Apply any scale factors to flux fields
+        if "flux_sf" in list(flux_dict.keys()):
             if flux_dict["flux_sf"] is not None:
                 if type(flux_dict["flux_sf"]) is dict:
-                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict["flux_sf"][source]} to {source}.")
+                    print(
+                        f"Warning! Applying a multiplicative scale factor of {flux_dict['flux_sf'][source]} to {source}."
+                    )
                     get_flux_data.data.flux.values *= flux_dict["flux_sf"][source]
                 elif type(flux_dict["flux_sf"]) in [int, float]:
-                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict["flux_sf"]} to {source}.")
+                    print(
+                        f"Warning! Applying a multiplicative scale factor of {flux_dict['flux_sf']} to {source}."
+                    )
                     get_flux_data.data.flux.values *= flux_dict["flux_sf"]
                 elif type(flux_dict["flux_sf"]) is list:
-                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict["flux_sf"][i]} to {source}.")
+                    print(
+                        f"Warning! Applying a multiplicative scale factor of {flux_dict['flux_sf'][i]} to {source}."
+                    )
                     get_flux_data.data.flux.values *= flux_dict["flux_sf"][i]
                 else:
                     raise KeyError("Use either a dict, float or list for flux scale factors.")
-        flux_data_dict[source] = get_flux_data        
+        flux_data_dict[source] = get_flux_data
     return flux_data_dict
+
 
 def get_mf_bc_data(bc_dict: dict):
     """
     -------------------------------------------------------
-    Retrieve boundary conditions data and apply any 
+    Retrieve boundary conditions data and apply any
     scaling factors to these data
     -------------------------------------------------------
     Args:
         bc_dict (dict):
             Dictionary of BC data specifications
-            Keys: 'species', 
-                  'domain', 
-                  'bc_input', 
-                  'bc_freq', 
-                  'bc_sf', 
+            Keys: 'species',
+                  'domain',
+                  'bc_input',
+                  'bc_freq',
+                  'bc_sf',
                   'store'
-                  'start_date', 
-                  'end_date', 
-    
+                  'start_date',
+                  'end_date',
+
     Returns:
         OpenGHG BC object for time of interest
     -------------------------------------------------------
     """
-    get_bc_data = get_bc(species=bc_dict["species"],
-                         domain=bc_dict["domain"],
-                         bc_input=bc_dict["bc_input"],
-                         start_date=bc_dict["start_date"],
-                         end_date=bc_dict["end_date"],
-                         store=bc_dict["store"],
-                        )
-    
+    get_bc_data = get_bc(
+        species=bc_dict["species"],
+        domain=bc_dict["domain"],
+        bc_input=bc_dict["bc_input"],
+        start_date=bc_dict["start_date"],
+        end_date=bc_dict["end_date"],
+        store=bc_dict["store"],
+    )
+
     # Apply any scale factors to BCs
     if "bc_sf" in list(bc_dict.keys()):
         if bc_dict["bc_sf"] is not None:
             if type(bc_dict["bc_sf"]) is dict:
                 for key in bc_dict["bc_sf"].keys():
-                    print(f"Warning! Applying a multiplicative scale factor of {bc_dict["bc_sf"][key]} to {key}.")
+                    print(
+                        f"Warning! Applying a multiplicative scale factor of {bc_dict['bc_sf'][key]} to {key}."
+                    )
                     get_bc_data.data[key].values *= bc_dict["bc_sf"][key]
             elif type(bc_dict["bc_sf"]) in [int, float]:
                 for key in get_bc_data.data.keys():
-                    print(f"Warning! Applying a multiplicative scale factor of {bc_dict["bc_sf"]} to {key}.")
+                    print(f"Warning! Applying a multiplicative scale factor of {bc_dict['bc_sf']} to {key}.")
                     get_bc_data.data[key].values *= bc_dict["bc_sf"]
             else:
                 raise KeyError("Use a dict or float value for the BC scale factors.")
     return get_bc_data
 
-def get_mf_obs(obs_dict: dict,
-               dataset_source: str,
-              )->dict:
+
+def get_mf_obs(
+    obs_dict: dict,
+    dataset_source: str,
+) -> dict:
     """
     -------------------------------------------------------
     Retrieves surface observation mole fractions and
@@ -170,102 +199,152 @@ def get_mf_obs(obs_dict: dict,
     Args:
        obs_dict (dict):
             Dictionary of observations data specifications
-            Keys: 'site', 
-                  'inlet', 
-                  'species', 
+            Keys: 'site',
+                  'inlet',
+                  'species',
                   'instrument',
-                  'start_date', 
-                  'end_date', 
+                  'start_date',
+                  'end_date',
                   'calibration_scale',
-                  'data_level', 
-                  'store', 
-                  'averaging_period', 
+                  'data_level',
+                  'store',
+                  'averaging_period',
                   'filters',
-                  
+
        dataset_source (str):
-           Specific key word used for PARIS 
+           Specific key word used for PARIS
            pseudo-observations
 
     Returns:
-        Dictionary of OpenGHG surface observation 
+        Dictionary of OpenGHG surface observation
         objects for each measurement station of interest
     -------------------------------------------------------
     """
     mf_obs_out_dict = {}
     sites = obs_dict["site"]
-    
+
+    species = obs_dict["species"]
+    keep_variables = [
+            f"{species}",
+            f"{species}_variability", 
+            f"{species}_repeatability",
+            f"{species}_number_of_observations",
+            "inlet",  # needed if multiple inlets combined
+            "inlet_height",  # sometimes needed if inlet='multiple' (may be outdated soon)
+            ]
+
     for i, site in enumerate(sites):
         try:
             # Retrieves AVERAGED mole fractions data
-            site_data = get_obs_surface(site=obs_dict["site"][i],
-                                        species=obs_dict["species"],
-                                        inlet=obs_dict["inlet"][i],
-                                        start_date=obs_dict["start_date"],
-                                        end_date=obs_dict["end_date"],
-                                        icos_data_level=obs_dict["data_level"][i],
-                                        average=obs_dict["averaging_period"][i],
-                                        instrument=obs_dict["instrument"][i],
-                                        calibration_scale=obs_dict["calibration_scale"],
-                                        store=obs_dict["store"],
-                                        keep_missing=True,
-                                        dataset_source=dataset_source,
-                                       )
-            
-            # Calculate observational uncertainty over averaging period 
-            site_data_no_ave = get_obs_surface(site=obs_dict["site"][i],
-                                               species=obs_dict["species"],
-                                               inlet=obs_dict["inlet"][i],
-                                               start_date=obs_dict["start_date"],
-                                               end_date=obs_dict["end_date"],
-                                               icos_data_level=obs_dict["data_level"][i],
-                                               instrument=obs_dict["instrument"][i],
-                                               calibration_scale=obs_dict["calibration_scale"],
-                                               store=obs_dict["store"],
-                                               keep_missing=True,
-                                               dataset_source=dataset_source,
-                                              )
+            site_data = get_obs_surface(
+                site=obs_dict["site"][i],
+                species=obs_dict["species"],
+                inlet=obs_dict["inlet"][i],
+                start_date=obs_dict["start_date"],
+                end_date=obs_dict["end_date"],
+                icos_data_level=obs_dict["data_level"][i],
+                average=obs_dict["averaging_period"][i],
+                instrument=obs_dict["instrument"][i],
+                calibration_scale=obs_dict["calibration_scale"],
+                store=obs_dict["store"],
+                keep_missing=True,
+                dataset_source=dataset_source,
+                keep_variables=keep_variables,
+            )
+
+            # Calculate observational uncertainty over averaging period
+            site_data_no_ave = get_obs_surface(
+                site=obs_dict["site"][i],
+                species=obs_dict["species"],
+                inlet=obs_dict["inlet"][i],
+                start_date=obs_dict["start_date"],
+                end_date=obs_dict["end_date"],
+                icos_data_level=obs_dict["data_level"][i],
+                instrument=obs_dict["instrument"][i],
+                calibration_scale=obs_dict["calibration_scale"],
+                store=obs_dict["store"],
+                keep_missing=True,
+                dataset_source=dataset_source,
+                keep_variables=keep_variables,
+            )
 
             # Observation uncertainty is defined as the sum in quadrature of:
-            # 1. The root-squared sum of the 1 min mf variabilities reported in the 
-            #    uploaded data in the averaging period and divided by the number of 
-            #    observations in the averaging period. This represents the "error" of 
+            # 1. The root-squared sum of the 1 min mf variabilities reported in the
+            #    uploaded data in the averaging period and divided by the number of
+            #    observations in the averaging period. This represents the "error" of
             #    the sampled mean.
             #
-            # 2. The variance of the mole fraction concentrations reported in the 
-            #    uploaded data over the averaging period. This accounts for the 
+            # 2. The variance of the mole fraction concentrations reported in the
+            #    uploaded data over the averaging period. This accounts for the
             #    variability in mole fractions over the averaging period.
 
-            
             # TO CHECK: variability for optical instruments, repeatability for ECD?
-            if "mf_variability" in list(site_data_no_ave[site].keys()) and "mf_repeatability" in list(site_data_no_ave[site].keys()):
+            if "mf_variability" in list(site_data_no_ave[site].keys()) and "mf_repeatability" in list(
+                site_data_no_ave[site].keys()
+            ):
                 # Sampled mean error of mf_variability (not averaged)
-                ds_resampled_rep = np.sqrt((site_data_no_ave[site]["mf_variability"]**2).resample(time=obs_dict["averaging_period"][i]).sum())/site_data_no_ave[site]["mf_variability"].resample(time=obs_dict["averaging_period"][i]).count()
+                ds_resampled_rep = (
+                    np.sqrt(
+                        (site_data_no_ave[site]["mf_variability"] ** 2)
+                        .resample(time=obs_dict["averaging_period"][i])
+                        .sum()
+                    )
+                    / site_data_no_ave[site]["mf_variability"]
+                    .resample(time=obs_dict["averaging_period"][i])
+                    .count()
+                )
 
                 # Propagate sampled mean error term of mf_variability with mf_repeatability
-                site_data[site]["mf_repeatability"] = np.sqrt(site_data[site]["mf_repeatability"] **2 + ds_resampled_rep **2)
-                site_data[site]["mf_variability"] = site_data[site]["mf_variability"]**2 
-               
-            elif "mf_variability" in list(site_data_no_ave[site].keys()) and "mf_repeatability" not in list(site_data_no_ave[site].keys()):
+                site_data[site]["mf_repeatability"] = np.sqrt(
+                    site_data[site]["mf_repeatability"] ** 2 + ds_resampled_rep**2
+                )
+                site_data[site]["mf_variability"] = site_data[site]["mf_variability"] ** 2
+
+            elif "mf_variability" in list(site_data_no_ave[site].keys()) and "mf_repeatability" not in list(
+                site_data_no_ave[site].keys()
+            ):
                 # In this instance, there is no repeatability. We use the sampled mean error of the variability in lieu
-                ds_resampled_rep = np.sqrt((site_data_no_ave[site]["mf_variability"]**2).resample(time=obs_dict["averaging_period"][i]).sum())/site_data_no_ave[site]["mf_variability"].resample(time=obs_dict["averaging_period"][i]).count()
-                
-                site_data[site]["mf_variability"] = site_data[site]["mf_variability"]**2
+                ds_resampled_rep = (
+                    np.sqrt(
+                        (site_data_no_ave[site]["mf_variability"] ** 2)
+                        .resample(time=obs_dict["averaging_period"][i])
+                        .sum()
+                    )
+                    / site_data_no_ave[site]["mf_variability"]
+                    .resample(time=obs_dict["averaging_period"][i])
+                    .count()
+                )
+
+                site_data[site]["mf_variability"] = site_data[site]["mf_variability"] ** 2
                 site_data[site]["mf_repeatability"] = ds_resampled_rep
 
-            elif "mf_variability" not in list(site_data_no_ave[site].keys()) and "mf_repeatability" in list(site_data_no_ave[site].keys()):
-                site_data[site]["mf_variability"] = site_data[site]["mf_variability"]**2
+            elif "mf_variability" not in list(site_data_no_ave[site].keys()) and "mf_repeatability" in list(
+                site_data_no_ave[site].keys()
+            ):
+                site_data[site]["mf_variability"] = site_data[site]["mf_variability"] ** 2
 
-            elif "mf_variability" not in list(site_data_no_ave[site].keys()) and "mf_repeatability" not in list(site_data_no_ave[site].keys()):
-                print(f"{site} mole fractions have no associated uncertainties. Using 0.1% of mf value as the repeatability")
-                pseudo_err = site_data[site]["mf"] * 0.001 
-                # Calculates the sampled mean error from pseudo uncertainties 
-                ds_resampled_rep = np.sqrt((pseudo_err**2).resample(time=obs_dict["averaging_period"][i]).sum())/site_data_no_ave[site]["mf"].resample(time=obs_dict["averaging_period"][i]).count()
+            elif "mf_variability" not in list(
+                site_data_no_ave[site].keys()
+            ) and "mf_repeatability" not in list(site_data_no_ave[site].keys()):
+                print(
+                    f"{site} mole fractions have no associated uncertainties. Using 0.01% of mf value as the repeatability"
+                )
+                pseudo_err = site_data[site]["mf"] * 0.0001
+                # Calculates the sampled mean error from pseudo uncertainties
+                ds_resampled_rep = (
+                    np.sqrt((pseudo_err**2).resample(time=obs_dict["averaging_period"][i]).sum())
+                    / site_data_no_ave[site]["mf"].resample(time=obs_dict["averaging_period"][i]).count()
+                )
 
                 site_data[site]["mf_repeatability"] = ds_resampled_rep
-                site_data[site]["mf_variability"] = site_data[site]["mf_variability"]**2 # Variance of mf over averaging period
+                site_data[site]["mf_variability"] = (
+                    site_data[site]["mf_variability"] ** 2
+                )  # Variance of mf over averaging period
 
+            site_data[site]["mf_repeatability"].attrs["units"] = site_data[site]["mf"].attrs["units"]
+            site_data[site]["mf_variability"].attrs["units"] = site_data[site]["mf"].attrs["units"]
 
-            # Check units and convert to mol/mol if in ppm 
+            # Check units and convert to mol/mol if in ppm
             site_data = check_obs_units(site_data)
 
             # Add data to output dictionary
@@ -275,84 +354,90 @@ def get_mf_obs(obs_dict: dict,
             print(f"\nNo obs data found for {site} \n")
             continue  # skip this site
         except AttributeError:
-            print(f"\nNo data found for {site} between {obs_dict["start_date"]} and {obs_dict["end_date"]}.\n")
+            print(
+                f"\nNo data found for {site} between {obs_dict['start_date']} and {obs_dict['end_date']}.\n"
+            )
             continue  # skip this site
         else:
             if site_data is None:
-                print(f"\nNo data found for {site} between {obs_dict["start_date"]} and {obs_dict["end_date"]}.\n")
+                print(
+                    f"\nNo data found for {site} between {obs_dict['start_date']} and {obs_dict['end_date']}.\n"
+                )
                 continue  # skip this site
     return mf_obs_out_dict
 
-def get_mf_obs_sims(flux_dict: dict, 
-                    fp_dict: dict, 
-                    obs_dict: dict, 
-                    bc_dict: dict, 
-                    use_bc: bool,
-                   ):
+
+def get_mf_obs_sims(
+    flux_dict: dict,
+    fp_dict: dict,
+    obs_dict: dict,
+    bc_dict: dict,
+    use_bc: bool,
+):
     """
     -------------------------------------------------------
-    Function to produce forward simulations of 
-    CO2 mole fractions. 
+    Function to produce forward simulations of
+    CO2 mole fractions.
     -------------------------------------------------------
     Args:
-        flux_dict (dict): 
+        flux_dict (dict):
             Dictionary of flux data specifications
-            Keys: 'species', 
-                  'source', 
-                  'domain', 
-                  'start_date', 
+            Keys: 'species',
+                  'source',
+                  'domain',
+                  'start_date',
                   'end_date',
                   'store'
-                  
-        fp_dict (dict): 
+
+        fp_dict (dict):
             Dictionary of footprints data specifications
-            Keys: 'site', 
-                  'fp_height', 
-                  'domain', 
+            Keys: 'site',
+                  'fp_height',
+                  'domain',
                   'species',
-                  'start_date', 
-                  'end_date', 
+                  'start_date',
+                  'end_date',
                   'store'
-                  
-        obs_dict (dict): 
+
+        obs_dict (dict):
             Dictionary of observations data specifications
-            Keys: 'site', 
-                  'inlet', 
-                  'species', 
+            Keys: 'site',
+                  'inlet',
+                  'species',
                   'instrument',
-                  'start_date', 
-                  'end_date', 
+                  'start_date',
+                  'end_date',
                   'calibration_scale',
-                  'data_level', 
-                  'store', 
-                  'averaging_period', 
-                  'filters'
-                  
-        bc_dict (dict): 
-            Dictionary of Boundary Conditions data specifications
-            Keys: 'species', 
-                  'domain', 
-                  'bc_input', 
-                  'bc_freq',
-                  'start_date', 
-                  'end_date', 
+                  'data_level',
                   'store',
-                  
-        use_bc (bool): 
+                  'averaging_period',
+                  'filters'
+
+        bc_dict (dict):
+            Dictionary of Boundary Conditions data specifications
+            Keys: 'species',
+                  'domain',
+                  'bc_input',
+                  'bc_freq',
+                  'start_date',
+                  'end_date',
+                  'store',
+
+        use_bc (bool):
             True: Retrieves BCs as specified in bc_dict.
-            False: Asssumes Obs are assumed to be baseline-subtracted 
+            False: Asssumes Obs are assumed to be baseline-subtracted
                    And BC data are NOT used
 
 
     Returns:
-        data_dict: 
-            Dictionary containing modelled simulations, fluxes, BCs, 
+        data_dict:
+            Dictionary containing modelled simulations, fluxes, BCs,
         sites:
-            List of returned sitenames that have available data over 
+            List of returned sitenames that have available data over
             period of interest
         inlet:
-            List of inlet heights for sites that have available data  
-            over period of interest 
+            List of inlet heights for sites that have available data
+            over period of interest
         fp_height:
             List of footprints heights for sites that have available
             data over period of interest
@@ -363,77 +448,69 @@ def get_mf_obs_sims(flux_dict: dict,
             List of averaging periods for sites that have available
             data over period of interest
     -------------------------------------------------------
-    """ 
+    """
     data_dict = {}
     sites = fp_dict["site"]
-    
+
     # Get CO2 flux fields
-    data_dict[".flux"] =  get_flux_data(flux_dict)
-    
-    # Get CO2 boundary conditions        
+    data_dict[".flux"] = get_flux_data(flux_dict)
+
+    # Get CO2 boundary conditions
     if use_bc is True:
         data_dict[".bc"] = get_mf_bc_data(bc_dict)
     else:
         data_dict[".bc"] = None
-    
+
     # Get dataset source entry (if exists, used for verification games)
     if "dataset_source" in obs_dict.keys():
         dataset_source = obs_dict["dataset_source"]
     else:
         dataset_source = None
-        
-    # Get mole fraction observations 
-    obs_mf_dict = get_mf_obs(obs_dict, 
-                             dataset_source=dataset_source,
-                            )
-    
+
+    # Get mole fraction observations
+    obs_mf_dict = get_mf_obs(
+        obs_dict,
+        dataset_source=dataset_source,
+    )
+
     # Get footprint datasets
     fp_data_dict = get_fps_data(fp_dict)
-   
+
     site_indices_to_keep = []
     for i, site in enumerate(sites):
         if (site in obs_mf_dict.keys()) and (site in fp_data_dict.keys()):
-            # ____ Create CO2 mole fraction forward simulations ____
             try:
-
-                site_ind = np.where(np.array(obs_dict["site"])==site)[0][0]
+                site_ind = np.where(np.array(obs_dict["site"]) == site)[0][0]
                 
-                model_scenario = openghg.analyse.ModelScenario(site=site,
-                                                               species=obs_dict["species"],
-                                                               inlet=obs_dict["inlet"][site_ind],
-                                                               start_date=obs_dict["start_date"],
-                                                               end_date=obs_dict["end_date"],
-                                                               obs=obs_mf_dict[site],
-                                                               footprint=fp_data_dict[site],
-                                                               flux=data_dict[".flux"],
-                                                               bc=data_dict[".bc"],
-                                                              )
-                split_by_sector = len(flux_dict["source"]) > 1
-                scenario_combined = model_scenario.footprints_data_merge(calc_fp_x_flux=True, split_by_sector=split_by_sector)
-
-                # HACK to make new results of `footprints_data_merge` match previous format used here
-                if "source" in scenario_combined.dims:
-                    mf_mod_var = "mf_mod_sectoral" if "mf_mod_sectoral" in scenario_combined.dims else "mf_mod_high_res_sectoral"
-
-                    for s in scenario_combined.source:
-                        scenario_combined[f"mf_mod_{s}"] = scenario_combined[mf_mod_var].sel(source=s, drop=True)
-                        scenario_combined[f"Hall_{s}"] = scenario_combined.fp_x_flux_sectoral.sel(source=s, drop=True)
-
-                    scenario_combined = scenario_combined.drop_vars([mf_mod_var, "fp_x_flux_sectoral"])
-
+                model_scenario = openghg.analyse.ModelScenario(
+                    site=site,
+                    species=obs_dict["species"],
+                    inlet=obs_dict["inlet"][site_ind],
+                    start_date=obs_dict["start_date"],
+                    end_date=obs_dict["end_date"],
+                    obs=obs_mf_dict[site],
+                    footprint=fp_data_dict[site],
+                    flux=data_dict[".flux"],
+                    bc=data_dict[".bc"],
+                )
+            
+                scenario_combined = model_scenario.footprints_data_merge(calc_fp_x_flux=True, 
+                                                                         split_by_sectors=True, 
+                                                                         recalculate=True)  
                 data_dict[site] = scenario_combined
                 # data_dict[site].bc_mod.values *= 1e-3 # convert from ppb (default in openghg) to ppm
-                data_dict[site].bc_mod.values *= 1e-9 # convert from ppb (default in openghg) to mol/mol
+                data_dict[site].bc_mod.values *= 1e-9  # convert from ppb (default in openghg) to mol/mol
+                if obs_dict["species"].lower() == "co2":
+                    data_dict[site]["mf_mod_high_res"].values = data_dict[site]["mf_mod_high_res_sectoral"].sum(dim="source")
                 site_indices_to_keep.append(site_ind)
 
             except SearchError:
-                print(f"\nError in reading in BC or flux data for {site}. \n")
+                print(f"Possible error in BC or flux data used for {site}. \n")
 
-    
     if len(site_indices_to_keep) == 0:
         raise SearchError("No site data found. Exiting process.")
 
-    # If data was not extracted correctly for any sites, 
+    # If data was not extracted correctly for any sites,
     # drop these from the rest of the inversion
     if len(site_indices_to_keep) < len(sites):
         sites = [obs_dict["site"][s] for s in site_indices_to_keep]
@@ -441,7 +518,7 @@ def get_mf_obs_sims(flux_dict: dict,
         fp_height = [fp_dict["fp_height"][s] for s in site_indices_to_keep]
         instrument = [obs_dict["instrument"][s] for s in site_indices_to_keep]
         averaging_period = [obs_dict["averaging_period"][s] for s in site_indices_to_keep]
-    
+
         return data_dict, sites, inlet, fp_height, instrument, averaging_period
 
     else:

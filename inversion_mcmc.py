@@ -202,14 +202,14 @@ def inferpymc(Hx,
     -----------------------------------
     """
     burn = int(burn)     # No. of iterations to discard in MCMC
-    hx = Hx.T            # Transpose of matrix of dosages with dimemsions of [t, region[sector]]
-    hxerr = Hxerr.T      # Transpose of matrix of coefficient of variability of dosages with dimensions of [t, region[sector]]
+    hx = Hx.T            # Matrix transpose of flux dosages [t, region[sector]]
+    hxerr = Hxerr.T      # Matrix transpose of coefficient of variability of flux dosages [t, region[sector]]
     nx = hx.shape[1]     # No. basis functions for all sectors stacked 
     ny = len(Y)          # No. time steps
-    nit = int(nit)       # Total no. of iterations in MCMC 
+    nit = int(nit)       # Total no. of iterations used in each MCMC chain
 
     if use_bc is True:
-        hbc = Hbc.T
+        hbc = Hbc.T      #  Matrix transpose of BC dosages [t, region[sector]]
         nbc = hbc.shape[1]
         
     nflux = len(list(xprior.keys()))   # No. flux sectors
@@ -259,6 +259,8 @@ def inferpymc(Hx,
             else:
                 mu = hx_dot_x + pt.dot(hbc, xbc)
 
+            pollution_model_error = sig[_sites, sigma_freq_index] * (Y-pt.dot(hbc, xbc))
+
         else:
             if add_offset:
                 offset = parseprior("offset", offsetprior, shape=nsites-1)
@@ -267,9 +269,14 @@ def inferpymc(Hx,
             else:
                 mu = hx_dot_x 
 
-        model_error = Ymodelerror * sig[_sites, sigma_freq_index]    
-        epsilon = pt.sqrt(error**2 + model_error**2 + 0.25)
-        y = pm.Normal("y", mu=mu, sigma=np.sqrt(epsilon), observed=Y, shape=ny)
+            pollution_model_error = sig[_sites, sigma_freq_index] * (hx_dot_x)
+
+        
+        min_model_error = Ymodelerror 
+                
+        epsilon = pt.maximum(pt.sqrt(error**2 + pollution_model_error**2), min_model_error)
+        
+        y = pm.Normal("y", mu=mu, sigma=epsilon, observed=Y, shape=ny)
 
         step1 = pm.NUTS(vars=all_distributions_x)
         step2 = pm.Slice(vars=[sig])
@@ -550,13 +557,12 @@ def inferpymc_postprocessouts(mcmc_results,
           the a priori emissions are constant over the inversion period
           or else monthly (and inversion is for less than one calendar year).
     """
-
     print("Post-processing PyMC output")
 
     # Get parameters for output file
-    nit = mcmc_dict["nit"] - mcmc_dict["burn"]  # No. of MCMC iterations used for inferring posterior
-    nx = Hx.shape[0] # No. basis functions for all sectors stacked 
-    ny = len(Y) # No. of time steps 
+    nit = mcmc_dict["nit"] - mcmc_dict["burn"]  # No. of MCMC iterations for inferring posterior scaling factors
+    nx = Hx.shape[0] # No. of stacked basis functions for all sectors
+    ny = len(Y) # No. of stacked time steps from observations
     nui = np.arange(2)
     steps = np.arange(nit)
     nparam = np.arange(nx)
@@ -612,9 +618,9 @@ def inferpymc_postprocessouts(mcmc_results,
 
     # ---- Y-VALUES HYPERPARAMETER (XOUTS * H) ---- #
     Ytrace = mcmc_results["Ytrace"]
-    Ymodmu = np.mean(Ytrace, axis=1)
-    Ymodmed = np.median(Ytrace, axis=1)
-    Ymodmode = np.zeros(shape=Ytrace.shape[0])
+    Ymodmu = np.mean(Ytrace, axis=1)                        # mean
+    Ymodmed = np.median(Ytrace, axis=1)                     # median
+    Ymodmode = np.zeros(shape=Ytrace.shape[0])              # mode
 
     for i in range(0, Ytrace.shape[0]):
         # if sufficient no. of iterations use a KDE to calculate mode
@@ -629,6 +635,7 @@ def inferpymc_postprocessouts(mcmc_results,
     Ymod95 = az.hdi(Ytrace.T, 0.95)
     Ymod68 = az.hdi(Ytrace.T, 0.68)
 
+    # Mole fraction a priori values
     if use_bc:
         Yapriori = np.sum(Hx.T, axis=1) + np.sum(Hbc.T, axis=1)
     else:
@@ -652,81 +659,67 @@ def inferpymc_postprocessouts(mcmc_results,
             site_lon[si] = fp_data[site].release_lon.values[0]
         bfds = fp_data[".basis"]
 
-    # ---- Calculate mean and mode posterior scale map and flux field ---- # 
-    # NB. Basis field [sector, lat, lon, time]
-    scalemap_mu_dict = {}   # Mean scale map dictionary
-    scalemap_mode_dict = {} # Mode scale map dictionary 
+    # ---- Calculate posterior scale maps and flux fields ---- #
+    scalemap_mean = np.zeros_like(bfds.values)    # Mean scale map [sector, lat, lon, time]
+    scalemap_median = np.zeros_like(bfds.values)  # Median scale map [sector, lat, lon, time]
+    scalemap_mode = np.zeros_like(bfds.values)    # Mode scale map [sector, lat, lon, time]
 
-    xouts = mcmc_results["xouts"]
+    _sshape = list(bfds.values.shape)
+    _sshape.append(2)
+
+    scalemap_68 = np.zeros(shape=(_sshape))       # 68 CI scale map [sector, lat, lon, time, bound]
+    scalemap_95 = np.zeros(shape=(_sshape))       # 95 CI scale map [sector, lat, lon, time, bound]
+
+    xouts = mcmc_results["xouts"]                 # {source: [region, nit-burn]}
     xoutsave = np.zeros(shape=(len(nparam), nit))
     nbasis_sectors = []
-    
+
     for i, flux_sector in enumerate(xouts.keys()):
         nbasis_sec = xouts[flux_sector].shape[0]
-        
         xoutsave[int(np.sum(nbasis_sectors)): int(np.sum(nbasis_sectors)+nbasis_sec), :] = xouts[flux_sector]
         nbasis_sectors.append(nbasis_sec)
-        
-        scalemap_mu = np.zeros_like(bfds[i].values)    # Mean scale map
-        scalemap_mode = np.zeros_like(bfds[i].values)  # Mode scale map
-        
-        for npm in range(1+int(bfds[i].values.max())):
-            scalemap_mu[np.squeeze(bfds[i].values)==npm] = np.mean(xouts[flux_sector][npm-1, :])
 
+        sec_bfds = bfds[i]
+        
+        for npm in range(1, int(sec_bfds.values.max())+1):
+            iy, ix = np.where(sec_bfds[:,:,0] == npm)
+            scalemap_mean[i, iy, ix, 0] = np.mean(xouts[flux_sector][npm-1])
+            scalemap_median[i, iy, ix, 0] = np.median(xouts[flux_sector][npm-1])
+            
             if np.nanmax(xouts[flux_sector][npm-1, :]) > np.nanmin(xouts[flux_sector][npm-1, :]):
                 xes = np.arange(np.nanmin(xouts[flux_sector][npm-1, :]), np.nanmax(xouts[flux_sector][npm-1, :]), 0.01)
                 kde = stats.gaussian_kde(xouts[flux_sector][npm-1, :]).evaluate(xes)
-                scalemap_mode[np.squeeze(bfds[i].values) == npm] = xes[kde.argmax()]
+                scalemap_mode[i, iy, ix, 0] = xes[kde.argmax()]
             else:
-                scalemap_mode[np.squeeze(bfds[i].values) == npm] = np.mean(xouts[npm-1, :])
+                scalemap_mode[i, iy, ix, 0] = np.mean(xouts[flux_sector][npm-1, :])
 
-        scalemap_mu_dict[flux_sector] = scalemap_mu[:, :, 0]
-        scalemap_mode_dict[flux_sector] = scalemap_mode[:, :, 0]
+            scalemap_68[i, iy, ix, 0, :] = az.hdi(xouts[flux_sector][npm-1, :], 0.68)
+            scalemap_95[i, iy, ix, 0, :] = az.hdi(xouts[flux_sector][npm-1, :], 0.95)
 
     xprior = mcmc_dict["xprior"]
 
-    scalemap_mu_flux = np.zeros_like(np.squeeze(bfds.values))
-    scalemap_mode_flux = np.zeros_like(np.squeeze(bfds.values))
-    for i, key in enumerate(xprior.keys()):
-        scalemap_mu_flux[i] = scalemap_mu_dict[key]
-        scalemap_mode_flux[i] = scalemap_mode_dict[key]
-    
-    
     # Get Fluxes 
     if rerun_file is not None:
         flux_array_all = np.expand_dims(rerun_file.fluxapriori.values, 2)
+        
     else:
         if emissions_name is None:
             raise ValueError("Emissions name not provided.")
+        
         else:
-            apriori_flux = np.zeros_like(np.squeeze(bfds.values))
-            for i, key in enumerate(xprior.keys()):
-                t_flux = fp_data[".flux"][key].data["time"]
+            apriori_flux = np.zeros_like(bfds.values)
+            for i, flux_sector in enumerate(xprior.keys()):
+                t_flux = fp_data[".flux"][flux_sector].data["time"]
                 if len(t_flux) > 1:
                     # Use time-averaged flux field 
-                    apriori_flux[i,:,:] = xr.DataArray.mean(fp_data[".flux"][key].data.flux, dim="time")
+                    apriori_flux[i,:,:,0] = xr.DataArray.mean(fp_data[".flux"][flux_sector].data.flux, dim="time")
                 else:
-                    apriori_flux[i,:,:] = fp_data[".flux"][key].data.flux.values[:,:,:]            
+                    apriori_flux[i,:,:,0] = fp_data[".flux"][flux_sector].data.flux.values[:,:,:]            
 
+    aposteriori_flux_mean = scalemap_mean * apriori_flux
+    aposteriori_flux_median = scalemap_median * apriori_flux
+    aposteriori_flux_mode = scalemap_mode * apriori_flux
     
-    # if flux_array_all.shape[2] == 1:
-    #     print("\nAssuming flux prior is annual and extracting first index of flux array.")
-    #     apriori_flux = flux_array_all[:, :, 0]
-    # else:
-    #     print("\nAssuming flux prior is monthly.")
-    #     print(f"Extracting weighted average flux prior from {start_date} to {end_date}")
-    #     allmonths = pd.date_range(start_date, end_date, freq="1h").values[:-1]
-    #     allmonths -= 1  # to align with zero indexed array
-
-    #     apriori_flux = np.zeros_like(flux_array_all[:, :, 0])
-
-    #     # calculate the weighted average flux across the whole inversion period
-    #     for m in np.unique(allmonths):
-    #         apriori_flux += flux_array_all[:, :, m] * np.sum(allmonths == m) / len(allmonths)
-
-    aposteriori_flux_mode = scalemap_mode_flux * apriori_flux
-    aposteriori_flux_mean = scalemap_mu_flux * apriori_flux
-
     # Basis functions to save
     bfarray = bfds.values - 1
 
@@ -734,9 +727,14 @@ def inferpymc_postprocessouts(mcmc_results,
     area = utils.areagrid(lat, lon)
     if not rerun_file:
         c_object = utils.get_country(domain, country_file=country_file)
-        cntryds = xr.Dataset(
-            {"country": (["lat", "lon"], c_object.country), "name": (["ncountries"], c_object.name)},
-            coords={"lat": (c_object.lat), "lon": (c_object.lon)},
+        cntryds = xr.Dataset({
+            "country": (["lat", "lon"], c_object.country), 
+            "name": (["ncountries"], c_object.name),
+        },
+            coords = {
+                "lat": (c_object.lat), 
+                "lon": (c_object.lon),
+            },
         )
         cntrynames = cntryds.name.values
         cntrygrid = cntryds.country.values
@@ -768,36 +766,41 @@ def inferpymc_postprocessouts(mcmc_results,
     fluxsector = []
     for i, key in enumerate(xprior.keys()):
         fluxsector.append(key)
+        emi_field_pri = area * apriori_flux[i,:,:,0] * (3600 * 24 * 365) * molarmass 
+        emi_field_opt_mean = area * aposteriori_flux_mean[i,:,:,0] * (3600 * 24 * 365) * molarmass
+        emi_field_opt_median = area * aposteriori_flux_median[i,:,:,0] * (3600 * 24 * 365) * molarmass
+        emi_field_opt_mode = area * aposteriori_flux_mode[i,:,:,0] * (3600 * 24 * 365) * molarmass
+
+        emi_field_opt_68_low = area * scalemap_68[i,:,:,0,0] * apriori_flux[i,:,:,0] * (3600 * 24 * 365) * molarmass 
+        emi_field_opt_68_upp = area * scalemap_68[i,:,:,0,1] * apriori_flux[i,:,:,0] * (3600 * 24 * 365) * molarmass
+        
+        emi_field_opt_95_low = area * scalemap_95[i,:,:,0,0] * apriori_flux[i,:,:,0] * (3600 * 24 * 365) * molarmass 
+        emi_field_opt_95_upp = area * scalemap_95[i,:,:,0,1] * apriori_flux[i,:,:,0] * (3600 * 24 * 365) * molarmass 
+                
         for ci, cntry in enumerate(cntrynames):
-            cntrytottrace = np.zeros(len(steps))
-            cntrytotprior = 0
+            ind_y, ind_x = np.where(cntrygrid == ci)
+            cntrytotprior = np.sum(emi_field_pri[ind_y, ind_x]) / unit_factor
+            cntrytottrace_mean = np.sum(emi_field_opt_mean[ind_y, ind_x]) / unit_factor
+            cntrytottrace_median = np.sum(emi_field_opt_median[ind_y, ind_x]) / unit_factor
+            cntrytottrace_mode = np.sum(emi_field_opt_mode[ind_y, ind_x]) / unit_factor
             
-            for bf in range(int(np.max(bfarray[i]))):   # bfarray runs from 0 to n-1
-                bothinds = np.logical_and(cntrygrid == ci, bfarray[i,:,:,0] == bf)
-                cntrytottrace += (
-                    np.sum(area[bothinds].ravel() * apriori_flux[i, bothinds].ravel() * 3600 * 24 * 365 * molarmass)
-                    * xouts[key][bf, :]
-                    / unit_factor
-                )
-                cntrytotprior += (
-                    np.sum(area[bothinds].ravel() * apriori_flux[i, bothinds].ravel() * 3600 * 24 * 365 * molarmass)
-                    / unit_factor
-                )
-            cntrymean[i, ci] = np.mean(cntrytottrace)
-            cntrymedian[i, ci] = np.median(cntrytottrace)
+            cntrytot68_low = np.sum(emi_field_opt_68_low[ind_y, ind_x]) / unit_factor
+            cntrytot68_upp = np.sum(emi_field_opt_68_upp[ind_y, ind_x]) / unit_factor
+            cntrytot95_low = np.sum(emi_field_opt_95_low[ind_y, ind_x]) / unit_factor
+            cntrytot95_upp = np.sum(emi_field_opt_95_upp[ind_y, ind_x]) / unit_factor
 
-            if np.nanmax(cntrytottrace) > np.nanmin(cntrytottrace):
-                xes = np.linspace(np.nanmin(cntrytottrace), np.nanmax(cntrytottrace), 200)
-                kde = stats.gaussian_kde(cntrytottrace).evaluate(xes)
-                cntrymode[i, ci] = xes[kde.argmax()]
-            else:
-                cntrymode[i, ci] = np.mean(cntrytottrace)
+            
+            cntrymean[i, ci] = cntrytottrace_mean
+            cntrymedian[i, ci] = cntrytottrace_median
+            cntrymode[i, ci] = cntrytottrace_mode
+            
+            cntry68[i,ci,0] = cntrytot68_low
+            cntry68[i,ci,1] = cntrytot68_upp
+            cntry95[i,ci,0] = cntrytot95_low
+            cntry95[i,ci,1] = cntrytot95_upp
 
-            cntrysd[i, ci] = np.std(cntrytottrace)
-            cntry68[i, ci, :] = az.hdi(cntrytottrace, 0.68)
-            cntry95[i, ci, :] = az.hdi(cntrytottrace, 0.95)
-            cntryprior[i, ci] = cntrytotprior
-
+            cntryprior[i,ci] = cntrytotprior
+   
     # Make convergence results suitable for saving 
     conv_xpdf_gr = []       # Gelman-Rubin value for x
     conv_xpdf_result = []   # Gelman-Rubin result for x 
@@ -819,35 +822,38 @@ def inferpymc_postprocessouts(mcmc_results,
             conv_bc_result.append(mcmc_results['convergence'][key]['convergence'])
             conv_bc_gr.append(mcmc_results['convergence'][key]['GR_value'])
 
-       
+  
     # Make output netcdf file
     data_vars = {
         "Yobs": (["nmeasure"], Y),
         "Yerror": (["nmeasure"], error),
         "Ytime": (["nmeasure"], Ytime),
         "Ymodelerror_prior": (["nmeasure"], Ymodelerror),
-        
         "Yapriori": (["nmeasure"], Yapriori),
         "Ymodmean": (["nmeasure"], Ymodmu),
         "Ymodmedian": (["nmeasure"], Ymodmed),
         "Ymodmode": (["nmeasure"], Ymodmode),
         "Ymod95": (["nmeasure", "nUI"], Ymod95),
         "Ymod68": (["nmeasure", "nUI"], Ymod68),
-        
-        "xtrace": (["nparam", "steps"], xoutsave),
-        
+
+        "xtrace": (["nparam", "steps"], xoutsave),        
         "sigtrace": (["steps", "nsigma_site", "nsigma_time"], mcmc_results["sigouts"].values),
         "siteindicator": (["nmeasure"], siteindicator),
         "sigmafreqindex": (["nmeasure"], sigma_freq_index),
         "sitenames": (["nsite"], sites),
         "sitelons": (["nsite"], site_lon),
         "sitelats": (["nsite"], site_lat),
-        "fluxapriori": (["fluxsector", "lat", "lon"], np.squeeze(apriori_flux)),
-        "fluxaposteriori_mean": (["fluxsector", "lat", "lon"], np.squeeze(aposteriori_flux_mean)),
-        "fluxaposteriori_mode": (["fluxsector", "lat", "lon"], np.squeeze(aposteriori_flux_mode)),
-        "scalingmean": (["fluxsector", "lat", "lon"], np.squeeze(scalemap_mu_flux)),
-        "scalingmode": (["fluxsector", "lat", "lon"], np.squeeze(scalemap_mode_flux)),
-        "basisfunctions": (["fluxsector", "lat", "lon"], np.squeeze(bfarray)),
+        
+        "fluxapriori": (["fluxsector", "lat", "lon", "nBF"], apriori_flux),
+        "fluxaposteriori_mean": (["fluxsector", "lat", "lon", "nBF"], aposteriori_flux_mean),
+        "fluxaposteriori_median": (["fluxsector", "lat", "lon", "nBF"], aposteriori_flux_median),
+        "fluxaposteriori_mode": (["fluxsector", "lat", "lon", "nBF"], aposteriori_flux_mode),
+        
+        "scalingmean": (["fluxsector", "lat", "lon", "nBF"], scalemap_mean),
+        "scalingmedian": (["fluxsector", "lat", "lon", "nBF"], scalemap_median),
+        "scalingmode": (["fluxsector", "lat", "lon", "nBF"], scalemap_mode),
+        "basisfunctions": (["fluxsector", "lat", "lon", "nBF"], bfarray),
+        
         "countrymean": (["fluxsector", "countrynames"], cntrymean),
         "countrymedian": (["fluxsector", "countrynames"], cntrymedian),
         "countrymode": (["fluxsector", "countrynames"], cntrymode),
@@ -856,6 +862,7 @@ def inferpymc_postprocessouts(mcmc_results,
         "country95": (["fluxsector", "countrynames", "nUI"], cntry95),
         "countryapriori": (["fluxsector", "countrynames"], cntryprior),
         "countrydefinition": (["lat", "lon"], cntrygrid),
+
         "xsensitivity": (["nmeasure", "nparam"], Hx.T),
     }
 
@@ -864,6 +871,7 @@ def inferpymc_postprocessouts(mcmc_results,
         "paramnum": (["nlatent"], nparam),
         "measurenum": (["nmeasure"], nmeasure),
         "UInum": (["nUI"], nui),
+        "nBF": (["nBF"], np.arange(1)),
         "nsites": (["nsite"], sitenum),
         "nsigma_time": (["nsigma_time"], np.unique(sigma_freq_index)),
         "nsigma_site": (["nsigma_site"], np.arange(mcmc_results["sigouts"].shape[1]).astype(int)),
@@ -1044,7 +1052,7 @@ def inferpymc_postprocessouts(mcmc_results,
 
     # output_filename = define_output_filename(outputpath, species, domain, outputname, start_date, ext=".nc")
 
-    output_filename = os.path.join(outputpath, f"{species}_{domain}_{outputname}_{start_date}.nc")
+    output_filename = os.path.join(outputpath, f"{species}_{domain}_{outputname}.nc")
     
     Path(outputpath).mkdir(parents=True, exist_ok=True)
     outds.to_netcdf(output_filename, encoding=encoding, mode="w")
