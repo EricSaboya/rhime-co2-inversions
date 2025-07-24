@@ -124,5 +124,8 @@ def paths_to_check():
     print("---- sensitivity.py ----")
     print("sys.path.append --> change to local dir of rhime-co2-inversions")
     print("")
+    print("---- utils.py ----")
+    print("load_json data_folder --> change to local copy of openghg_defs")
+    print("")
     
     

@@ -41,6 +41,9 @@ def rhime_inversions(obs_dict: dict = None,
                      outputname: str = None,
                      outputpath: str = None,
                      country_file: str = None,
+                     save_merged_data: bool = False,
+                     read_merged_data: bool = False,
+                     merged_data_name: str = None
                     ):
     """
     -------------------------------------------------------
@@ -91,53 +94,76 @@ def rhime_inversions(obs_dict: dict = None,
             Path to countryfile mask to be used 
     -------------------------------------------------------    
     """
-    # Get CO2 obs and create forward simulations 
-    # (w./ Hall term for each sector)
-    (data_dict, 
-     sites, 
-     inlet, 
-     fp_height, 
-     instrument, 
-     averaging_period) = get_mf_obs_sims(flux_dict, 
-                                         fp_dict, 
-                                         obs_dict, 
-                                         bc_dict, 
-                                         use_bc,
-                                        )
-   
-    # Update site parameters to remove sites with 
-    # no data available during period of interest 
-    if sites is None:
+    
+    if read_merged_data == True:
+        print(f'\nReading merged data from:')
+        print(merged_data_name)
+        data_in = open(f"{merged_data_name}_{obs_dict['start_date']}.pickle",'rb')
+        fp_data = pickle.load(data_in)
+        data_in.close()
+        
         sites = obs_dict["site"]
         inlet = obs_dict["inlet"]
         fp_height = fp_dict["fp_height"]
         instrument = obs_dict["instrument"]
         averaging_period = obs_dict["averaging_period"]
+        
+    else:
+        print(f'Running data read and merge process...')
+        # Get CO2 obs and create forward simulations 
+        # (w./ Hall term for each sector)
+        (data_dict, 
+        sites, 
+        inlet, 
+        fp_height, 
+        instrument, 
+        averaging_period) = get_mf_obs_sims(flux_dict, 
+                                            fp_dict, 
+                                            obs_dict, 
+                                            bc_dict, 
+                                            use_bc,
+                                            )
+    
+        # Update site parameters to remove sites with 
+        # no data available during period of interest 
+        if sites is None:
+            sites = obs_dict["site"]
+            inlet = obs_dict["inlet"]
+            fp_height = fp_dict["fp_height"]
+            instrument = obs_dict["instrument"]
+            averaging_period = obs_dict["averaging_period"]
 
-    basis_dict["site"] = sites 
-    basis_dict["source"] = flux_dict["source"]
-    basis_dict["domain"] = fp_dict["domain"]
-    basis_dict["start_date"] = obs_dict["start_date"]
-                
-    # Calculate basis functions for each flux sector
-    (fp_data, 
-     tempdir, 
-     basis_dir, 
-     bc_basis_dir) = cbf.basis_functions_wrapper(data_dict,
-                                                 basis_dict,
-                                                 use_bc=use_bc,
-                                                 outputname=outputname,
-                                                 outputpath=outputpath,
-                                                )
+        basis_dict["site"] = sites 
+        basis_dict["source"] = flux_dict["source"]
+        basis_dict["domain"] = fp_dict["domain"]
+        basis_dict["start_date"] = obs_dict["start_date"]
+                    
+        # Calculate basis functions for each flux sector
+        (fp_data, 
+        tempdir, 
+        basis_dir, 
+        bc_basis_dir) = cbf.basis_functions_wrapper(data_dict,
+                                                    basis_dict,
+                                                    use_bc=use_bc,
+                                                    outputname=outputname,
+                                                    outputpath=outputpath,
+                                                    )
 
-    # Apply data filtering
-    if obs_dict["filters"] is not None:
-        fp_data = utils.filtering(fp_data, obs_dict["filters"])
+        # Apply data filtering
+        if obs_dict["filters"] is not None:
+            fp_data = utils.filtering(fp_data, obs_dict["filters"])
 
-    # Calculate model errors
-    fp_data = model_error_method_parser(fp_data, 
-                                        model_error_method,
-                                       )
+        # Calculate model errors
+        fp_data = model_error_method_parser(fp_data, 
+                                            model_error_method,
+                                        )
+
+        if save_merged_data == True:
+            data_out = open(f"{merged_data_name}_{obs_dict['start_date']}.pickle",'wb')
+            pickle.dump(fp_data,data_out)
+            data_out.close()
+            print('\nMerged data saved to:')
+            print(merged_data_name)
 
     # Remove any sites that return empty data array post-filtering
     s_dropped = []

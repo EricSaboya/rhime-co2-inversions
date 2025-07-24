@@ -25,9 +25,6 @@ def inputs(start_date,end_date):
     Edit as needed 
     """
     
-    flux_names = ["ff-edgar-mth","nee-jules-mth"]#,"rtot-jules-mth"]
-    sectors = ["fossil","nee"]#,"rtot"]
-    
     # Dictionary containing observations data specifications
     obs_dict = {"species": "co2",
                 "site": ["HFD", "MHD", "RGL", "TAC"],
@@ -41,22 +38,39 @@ def inputs(start_date,end_date):
                 "end_date": end_date,#"2014-05-01",
                 "filters": ["daytime"],
                }
-
+    '''
     # Dictionary containing CO2 fluxes data specifications 
     flux_dict = {"species": "co2", 
                  "domain": "EUROPE",
-                 "source": flux_names, 
+                 "source": ["ff-edgar-mth","gpp-jules-mth", "rtot-jules-mth"], 
                 "start_date": start_date,#"2014-04-01",
                 "end_date": end_date,#"2014-05-01",
                  "store": "user",
-                 "flux_sf": {flux_names[0]: 1.0,
-                             flux_names[1]: 1.0#,
-                             #flux_names[2]: 1.0
+                 "flux_sf": {"ff-edgar-mth": 1.0, 
+                             "gpp-jules-mth": 1.0,
+                             "rtot-jules-mth": 1.0,
+                            }, 
+                 "sector_dict": {"fossil": "ff-edgar-mth",
+                                 "gee": "gpp-jules-mth",
+                                 "rtot": "rtot-jules-mth",
+                                },
+                }
+    '''
+    # Dictionary containing CO2 fluxes data specifications 
+    flux_dict = {"species": "co2", 
+                 "domain": "EUROPE",
+                 "source": ["ff-edgar-mth","gpp-jules-mth","rtot-jules-mth"], 
+                "start_date": start_date,#"2014-04-01",
+                "end_date": end_date,#"2014-05-01",
+                 "store": "user",
+                 "flux_sf": {"ff-edgar-mth": 1.0,
+                             "gpp-jules-mth": 1.0,
+                             "rtot-jules-mth": 1.0
                             }, 
                  
-                 "sector_dict": {sectors[0]: flux_names[0],
-                                 sectors[1]: flux_names[1]#,
-                                 #sectors[2]: flux_names[2]
+                 "sector_dict": {"fossil": "ff-edgar-mth",
+                                 "gpp": "gpp-jules-mth",
+                                 "rtot": "rtot-jules-mth"
                                 },
                 }
 
@@ -85,15 +99,15 @@ def inputs(start_date,end_date):
     basis_dict = {"fp_basis_case": None,
                   "basis_directory": None, 
                   "fp_basis_algorithm": "weighted",
-                  "nbasis": [50]*len(flux_names),
+                  "nbasis": [50, 50],# 50],
                   "bc_basis_case": "NESW",
                   "bc_basis_directory": "/data/users/alice.ramsden/LPDM_co2/bc_basis_functions",
                  }
 
     # MCMC dict
-    mcmc_inputs_dict = {"xprior": {flux_names[0]: {"pdf": "truncatednormal", "mu": 1.2, "sigma": 1.2, "lower":0.0},
-                                   flux_names[1]: {"pdf": "truncatednormal", "mu": 1, "sigma": 2.0, "lower":0.0}},#,
-                                   #flux_names[2]: {"pdf": "truncatednormal", "mu": 1, "sigma": 2.0, "lower":0.0}},
+    mcmc_inputs_dict = {"xprior": {"ff-edgar-mth": {"pdf": "truncatednormal", "mu": 1.2, "sigma": 1.2, "lower":0.0},
+                                   "rtot-jules-mth": {"pdf": "truncatednormal", "mu": 1, "sigma": 2.0, "lower":0.0},
+                                   "gpp-jules-mth": {"pdf": "truncatednormal", "mu": 1, "sigma": 2.0, "lower":0.0}},
                         "bcprior": {"pdf": "truncatednormal", "lower": 0.0, "mu":1.0, "sigma": 0.05},
                         "sigprior": {"pdf": "uniform", "lower": 0.1, "upper": 3.0}, 
                         "add_offset": False, 
@@ -104,6 +118,24 @@ def inputs(start_date,end_date):
                         "nchain": 2,
                         "sigma_per_site": True
                        }
+    
+    '''
+    mcmc_inputs_dict = {"xprior": {"ff-edgar-mth": {"pdf": "truncatednormal", "mu": 1.2, "sigma": 1.2, "lower":0.0},
+                                   "gpp-jules-mth": {"pdf": "truncatednormal", "mu": 1.0, "sigma": 2.0, "lower": 0.0},
+                                   "rtot-jules-mth": {"pdf": "truncatednormal", "mu": 1.0, "sigma": 2.0, "lower":0.0},
+                                  },
+                        "bcprior": {"pdf": "truncatednormal", "lower": 0.0, "mu":1.0, "sigma": 0.05},
+                        "sigprior": {"pdf": "uniform", "lower": 0.1, "upper": 3.0}, 
+                        "add_offset": False, 
+                        "offsetprior": None, 
+                        "nit": 5500,
+                        "burn": 1000, 
+                        "tune": 2000,
+                        "nchain": 2,
+                        "sigma_per_site": True
+                       }
+    
+    '''
                         
     return obs_dict, flux_dict, fp_dict, bc_dict, basis_dict, mcmc_inputs_dict    
 
@@ -114,7 +146,7 @@ def main(start_date,end_date):
     model_error_method = "residual"
     sigma_freq = None
         
-    outputname = f"co2_4site_2sector_weekly"
+    outputname = f"co2_4site_3sector_monthly"
     outputpath = "/home/users/alice.ramsden/data/co2_inversions/"
     country_file = "/home/users/alice.ramsden/data/LPDM_co2/countries/country_EUROPE_EEZ_PARIS_gapfilled.nc"
     
@@ -147,7 +179,7 @@ def main(start_date,end_date):
                                country_file=country_file,
                                save_merged_data=True,
                                read_merged_data=False,
-                               merged_data_name=f'/data/scratch/alice.ramsden/merged_data/{outputname}'
+                               merged_data_name='/data/scratch/alice.ramsden/merged_data/co2_4site_3sector_monthly'
                               )
 
 if __name__ == "__main__":

@@ -651,6 +651,13 @@ def inferpymc_postprocessouts(mcmc_results,
             site_lat[si] = fp_data[site].release_lat.values[0]
             site_lon[si] = fp_data[site].release_lon.values[0]
         bfds = fp_data[".basis"]
+        
+    print(bfds.values.shape)
+        
+    #if len(bfds.values.shape) == 2:
+    #    bfds = bfds.expand_dims(dim='time',axis=0)
+        
+    #print(bfds.values.shape)
 
     # ---- Calculate mean and mode posterior scale map and flux field ---- # 
     # NB. Basis field [sector, lat, lon, time]
@@ -685,11 +692,15 @@ def inferpymc_postprocessouts(mcmc_results,
 
     xprior = mcmc_dict["xprior"]
 
-    scalemap_mu_flux = np.zeros_like(np.squeeze(bfds.values))
-    scalemap_mode_flux = np.zeros_like(np.squeeze(bfds.values))
+    scalemap_mu_flux = np.zeros_like(bfds.values)
+    scalemap_mode_flux = np.zeros_like(bfds.values)
+    
+    #print(scalemap_mu_flux.shape)
+    #print(xprior.keys())
+    
     for i, key in enumerate(xprior.keys()):
-        scalemap_mu_flux[i] = scalemap_mu_dict[key]
-        scalemap_mode_flux[i] = scalemap_mode_dict[key]
+        scalemap_mu_flux[:,:,i] = scalemap_mu_dict[key]
+        scalemap_mode_flux[:,:,i] = scalemap_mode_dict[key]
     
     
     # Get Fluxes 
@@ -842,12 +853,12 @@ def inferpymc_postprocessouts(mcmc_results,
         "sitenames": (["nsite"], sites),
         "sitelons": (["nsite"], site_lon),
         "sitelats": (["nsite"], site_lat),
-        "fluxapriori": (["fluxsector", "lat", "lon"], np.squeeze(apriori_flux)),
-        "fluxaposteriori_mean": (["fluxsector", "lat", "lon"], np.squeeze(aposteriori_flux_mean)),
-        "fluxaposteriori_mode": (["fluxsector", "lat", "lon"], np.squeeze(aposteriori_flux_mode)),
-        "scalingmean": (["fluxsector", "lat", "lon"], np.squeeze(scalemap_mu_flux)),
-        "scalingmode": (["fluxsector", "lat", "lon"], np.squeeze(scalemap_mode_flux)),
-        "basisfunctions": (["fluxsector", "lat", "lon"], np.squeeze(bfarray)),
+        "fluxapriori": (["fluxsector", "lat", "lon"], apriori_flux),
+        "fluxaposteriori_mean": (["fluxsector", "lat", "lon"], aposteriori_flux_mean),
+        "fluxaposteriori_mode": (["fluxsector", "lat", "lon"], aposteriori_flux_mode),
+        "scalingmean": (["fluxsector", "lat", "lon"], scalemap_mu_flux),
+        "scalingmode": (["fluxsector", "lat", "lon"], scalemap_mode_flux),
+        "basisfunctions": (["fluxsector", "lat", "lon"], bfarray),
         "countrymean": (["fluxsector", "countrynames"], cntrymean),
         "countrymedian": (["fluxsector", "countrynames"], cntrymedian),
         "countrymode": (["fluxsector", "countrynames"], cntrymode),

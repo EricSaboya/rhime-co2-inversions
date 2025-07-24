@@ -101,13 +101,13 @@ def get_flux_data(flux_dict: dict)->dict:
         if "flux_sf" in list(flux_dict.keys()): 
             if flux_dict["flux_sf"] is not None:
                 if type(flux_dict["flux_sf"]) is dict:
-                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict["flux_sf"][source]} to {source}.")
+                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict['flux_sf'][source]} to {source}.")
                     get_flux_data.data.flux.values *= flux_dict["flux_sf"][source]
                 elif type(flux_dict["flux_sf"]) in [int, float]:
-                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict["flux_sf"]} to {source}.")
+                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict['flux_sf']} to {source}.")
                     get_flux_data.data.flux.values *= flux_dict["flux_sf"]
                 elif type(flux_dict["flux_sf"]) is list:
-                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict["flux_sf"][i]} to {source}.")
+                    print(f"Warning! Applying a multiplicative scale factor of {flux_dict['flux_sf'][i]} to {source}.")
                     get_flux_data.data.flux.values *= flux_dict["flux_sf"][i]
                 else:
                     raise KeyError("Use either a dict, float or list for flux scale factors.")
@@ -149,11 +149,11 @@ def get_mf_bc_data(bc_dict: dict):
         if bc_dict["bc_sf"] is not None:
             if type(bc_dict["bc_sf"]) is dict:
                 for key in bc_dict["bc_sf"].keys():
-                    print(f"Warning! Applying a multiplicative scale factor of {bc_dict["bc_sf"][key]} to {key}.")
+                    print(f"Warning! Applying a multiplicative scale factor of {bc_dict['bc_sf'][key]} to {key}.")
                     get_bc_data.data[key].values *= bc_dict["bc_sf"][key]
             elif type(bc_dict["bc_sf"]) in [int, float]:
                 for key in get_bc_data.data.keys():
-                    print(f"Warning! Applying a multiplicative scale factor of {bc_dict["bc_sf"]} to {key}.")
+                    print(f"Warning! Applying a multiplicative scale factor of {bc_dict['bc_sf']} to {key}.")
                     get_bc_data.data[key].values *= bc_dict["bc_sf"]
             else:
                 raise KeyError("Use a dict or float value for the BC scale factors.")
@@ -275,11 +275,11 @@ def get_mf_obs(obs_dict: dict,
             print(f"\nNo obs data found for {site} \n")
             continue  # skip this site
         except AttributeError:
-            print(f"\nNo data found for {site} between {obs_dict["start_date"]} and {obs_dict["end_date"]}.\n")
+            print(f"\nNo data found for {site} between {obs_dict['start_date']} and {obs_dict['end_date']}.\n")
             continue  # skip this site
         else:
             if site_data is None:
-                print(f"\nNo data found for {site} between {obs_dict["start_date"]} and {obs_dict["end_date"]}.\n")
+                print(f"\nNo data found for {site} between {obs_dict['start_date']} and {obs_dict['end_date']}.\n")
                 continue  # skip this site
     return mf_obs_out_dict
 
@@ -408,6 +408,10 @@ def get_mf_obs_sims(flux_dict: dict,
                                                                flux=data_dict[".flux"],
                                                                bc=data_dict[".bc"],
                                                               )
+
+                #print(data_dict['.flux']['total-mth'].data)
+
+                #print(model_scenario.data)
 
                 if len(flux_dict["source"]) == 1:
                     scenario_combined = model_scenario.footprints_data_merge()
