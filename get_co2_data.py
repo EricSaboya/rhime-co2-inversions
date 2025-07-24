@@ -420,7 +420,6 @@ def get_mf_obs_sims(flux_dict: dict,
                         scenario_combined[f"Hall_{s}"] = scenario_combined.fp_x_flux_sectoral.sel(source=s, drop=True)
 
                     scenario_combined = scenario_combined.drop_vars([mf_mod_var, "fp_x_flux_sectoral"])
-                    
                 data_dict[site] = scenario_combined
                 # data_dict[site].bc_mod.values *= 1e-3 # convert from ppb (default in openghg) to ppm
                 data_dict[site].bc_mod.values *= 1e-9 # convert from ppb (default in openghg) to mol/mol
